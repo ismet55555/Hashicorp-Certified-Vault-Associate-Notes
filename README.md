@@ -145,9 +145,12 @@ TODO
 - https://www.vaultproject.io/docs/auth/userpass 
 - For human operators
 - Composed of username and password only
-- Enable userpass: `vault auth enable userpass`
-- Tune userpass: `vault auth tune -description "My Userpass" userpass/`
-- Create userpass user: `vault write auth/userpass/users/<USERNAME> password=<PASSWORD>`
+- Enable userpass:
+	- `vault auth enable userpass`
+- Tune userpass:
+	- `vault auth tune -description "My Userpass" userpass/`
+- Create userpass user:
+	- `vault write auth/userpass/users/<USERNAME> password=<PASSWORD>`
 
 
 ### Auth Method: AppRole
@@ -156,20 +159,23 @@ TODO
 - Used for machines and apps
 - Consists of RoleID (Username) and SecretID (password)
 - Vault server push secret ID to the client, or have client hold secretID when it boots up
-- Enable AppRole: `vault auth enable approle`
-- Tune AppRole: `vault auth tune -description "My AppRole" approle/`
+- Enable AppRole:
+	- `vault auth enable approle`
+- Tune AppRole:
+	- `vault auth tune -description "My AppRole" approle/`
 - Create a named role:
-	- `vault write auth/approle/<ROLE_NAME> \
-		role_name=<ROLE_NAME> \
-		secret_id_ttl=<SECRET_ID_TTL> \
-		token_num_uses=<TOKEN_NUM_USES> \
-		token_ttl=<TOKEN_TTL> \
-		token_max_ttl=<TOKEN_MAX_TTL>`
-- Fetch the role ID: `vault read auth/approle/role/<ROLE_NAME>/role-id`
-- Fetch the secret ID: `vault write auth/approle/role/<ROLE_NAME>/secret-id`
+	- ```
+		vault write auth/approle/<ROLE_NAME> \
+				role_name=<ROLE_NAME> \
+				secret_id_ttl=<SECRET_ID_TTL> \
+				token_num_uses=<TOKEN_NUM_USES> \
+				token_ttl=<TOKEN_TTL> \
+				token_max_ttl=<TOKEN_MAX_TTL>
+		```
 
 - Logging in with AppRole
-	- Information: `vault path-help auth/approle/login`
+	- Information:
+		- `vault path-help auth/approle/login`
 	- Generating Vault Client Token
 		- Need `role_id`
 			- `vault read auth/approle/role/<ROLE_NAME>/role-id`
@@ -185,6 +191,9 @@ TODO
 			- POST to `<VAULT_ADDR>/v1/auth/approle/login`
 			- Passed data includes `role_id` and `secret_id`
 	
+### Auth Method: AWS
+
+TODO
 
 
 !!! tip Exam Tip
@@ -244,6 +253,125 @@ TODO
 - `vault auth disable [options] PATH`
 	- Example: `vault auth disable approle/`
 	- Note that we did not have to spacify path (auth/approle), since we are using `auth`
+
+
+
+
+## Vault Policies
+
+- As everything, policies are path based
+- Grant or forbid access to certain paths and operations (what you can do in Vault)
+- Policies are `deny` by default (Empty policy)
+- Policies are assigned to tokens, identity, or auth method
+
+- Define permissions (Access Control Lists (ACL))
+- No internal versioning of policies
+	- Make you back up some other way
+
+
+### Default Policy
+
+- Allow tokens to look up their own properties
+	- `path "auth/token/lookup-self" { ... }`
+- Allow tokens to renew themselves
+    - `path "auth/token/renew-self" { ... }`
+- Allow tokens to revoke themselves
+	- `path "auth/token/revoke-self" { ... }`
+- Allow tokens to look up its own capabilities on a path
+    - `path "sys/capabilities-self" { ... }`
+- Allow a token to look up its own entity by id or name
+    - `path "identity/entity/id/{{identity.entity.id}}" { ... }`
+
+
+### Policy Syntax
+
+- HCL (preferred) or JSON
+- path (where) and capabilities (what)
+- Basic path expression:
+	- `path "some-path/in/valut"`
+- Two wildcards:
+	1. glob `*`
+		- Added at the END of a path, matches extension of path (This is not RegEx)
+		- Example: `path "some-path/*"` -> `path "some-path/something"` and `path "some-path/something/else"`
+	2. segment `+`
+		- Placeholder WITHIN a path, matches any number of characters
+		- Example: `path "secrets/+/blah"` -> `path "secrets/something/blah"` and `path "secrets/cool/blah"`
+
+	
+
+- Example: Grant read access to secret `secret/foo`
+	- ```hcl
+		path "secret/foo" {
+			capabilities = ["read", "list"]
+		}
+		```
+- Wildcard `*` addresses all downstream paths 
+	- Example: Grant read access to all secrets
+	- ```hcl
+		path "secret/*" {
+			capabilities = ["read", "list"]
+		}
+		```
+- Note that any sub path can be overridden by setting a policy:
+	- ```hcl
+		path "secret/super-secret" {
+			capabilities = ["deny"]
+		} 
+		```
+- Policies rules can be set up to allow, disallow, or require policy parameters
+	- Example: `secret/restricted` can only contain any value for `foo`, and `zip` or `zap` for `bar`
+	- ```hcl
+		path "secret/restricted" {
+			capabilities = ["create"]
+			allowed_parameters = {
+				"foo" = []
+				"bar" = ["zip", "zap"]
+			}
+		}
+		```
+- Can use "glob" patterns / wildcard to match paths
+	- Example: `secret/foo/*` will match `secret/foo/bar`
+	- ```hcl
+		path "secret/foo/*" {
+			capabilities = ["read", "list"]
+		}
+		```
+	- **NOTE:** `"secret/foo"` would only address `secret/foo`, and nothing under it
+- Any number of characters that are bounded withing a single path segment, use `+`
+    - Example: Permit reading `secret/foo/bar/teamb`, `secret/bar/foo/teamb`, etc.
+	- ```hcl
+		path "secret/+/+/teamb" {
+			capabilities = ["read"]
+		}
+		```
+
+### Templated Policies (Parameters)
+
+- Dynamic way of defining paths in policies
+- Using `{{ }}` to let vault know that you are adding a parameter, then adding the path to the parameter
+	- Example: Resolve the name of the entity 
+		- `path "secret/{{identity.entity.name}}/*" { ... }`
+- **NOTE:** Currently, the only source for parameters is `identity` secrets engine
+
+
+### Capabilities
+
+- `create` - Creating data at the given path (similar to `update`, which is also `POST/PUT` call)
+- `read` - Reading data at the given path
+- `update` - Changing data at given path
+- `delete` - Deleting data at given path
+- `list` - Listing data at given path
+- `sudo` - Access to paths that are *root-protected*
+- `deny` - Disallow access to given path
+
+
+### Policy Rules
+
+- Policy that Vault applies are determined by the most-specific match available
+- If same pattern appears in multiple policies, the union of both is taken
+	- Example: Combine `[read, list]` with `[create]`
+- If different patterns appear in multiple policies, the highest-precedence one is taken
+
 
 
 
