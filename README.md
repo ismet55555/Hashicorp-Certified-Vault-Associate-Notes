@@ -268,6 +268,10 @@ TODO
 - No internal versioning of policies
 	- Make you back up some other way
 
+### Root Policy
+
+- Can do ANYTHING
+- Careful who gets assigned this policy!
 
 ### Default Policy
 
@@ -286,7 +290,8 @@ TODO
 ### Policy Syntax
 
 - HCL (preferred) or JSON
-- path (where) and capabilities (what)
+- Policy Path: Where the policy is applied
+- Policy Capabilities: What acations are allowed
 - Basic path expression:
 	- `path "some-path/in/valut"`
 - Two wildcards:
@@ -296,8 +301,9 @@ TODO
 	2. segment `+`
 		- Placeholder WITHIN a path, matches any number of characters
 		- Example: `path "secrets/+/blah"` -> `path "secrets/something/blah"` and `path "secrets/cool/blah"`
+	- **NOTE:** `"secret/foo"` would only address `secret/foo`, and nothing under it
 
-	
+#### Examples
 
 - Example: Grant read access to secret `secret/foo`
 	- ```hcl
@@ -336,7 +342,6 @@ TODO
 			capabilities = ["read", "list"]
 		}
 		```
-	- **NOTE:** `"secret/foo"` would only address `secret/foo`, and nothing under it
 - Any number of characters that are bounded withing a single path segment, use `+`
     - Example: Permit reading `secret/foo/bar/teamb`, `secret/bar/foo/teamb`, etc.
 	- ```hcl
@@ -356,13 +361,15 @@ TODO
 
 ### Capabilities
 
-- `create` - Creating data at the given path (similar to `update`, which is also `POST/PUT` call)
-- `read` - Reading data at the given path
-- `update` - Changing data at given path
-- `delete` - Deleting data at given path
-- `list` - Listing data at given path
-- `sudo` - Access to paths that are *root-protected*
-- `deny` - Disallow access to given path
+- Follows CRUD semantics (Create, Read, Update, Delete)
+	- `create` - Creating data at the given path (similar to `update`, which is also `POST/PUT` call)
+	- `read` - Reading data at the given path
+	- `update` - Changing data at given path
+	- `delete` - Deleting data at given path
+- Additional capabilities:
+	- `list` - Listing data at given path. No access to key data.
+	- `sudo` - Access to paths that are *root-protected*
+	- `deny` - Disallow access to given path. Overrides any other action.
 
 
 ### Policy Rules
@@ -373,6 +380,177 @@ TODO
 - If different patterns appear in multiple policies, the highest-precedence one is taken
 
 
+### Working with Policies
+
+- List existing policies
+	- `vault policy list`
+- Read the contents of a policy
+	- `vault policy read [OPTIONS] [POLICY NAME]`
+		- Example: `vault policy read secrets-mgmt`
+- Write a new policy or update an existing policy
+	l. `vault policy write [OPTIONS] [POLICY NAME] [POLICY FILE]`
+		- Example: `vault policy write secrets-mgmt policy.hcl`
+	2. `vault policy write [OPTIONS] [POLICY NAME] -`
+		- Example: `cat policy.hcl | vault policy write secrets-mgmt -`
+- Delete a policy
+	- `vault policy delete [OPTIONS] [POLICY NAME]`
+		- Example: `vault policy delete secrets-mgmt`
+- Format the policy (more readable syntx)
+	- `vault policy fmt [OPTIONS] [POLICY FILE]`
+		- Example: `vault policy fmt policy.hcl`
+
+
+### Assigning Policies
+
+The policy has to already be created and active in Vault to be assigned.
+
+1. Associate directly with a token
+	- Assign a policy at token creation
+	- Example: `vault token create -policy=secrets-mgmt`
+2. Assign to a user in userpass
+	- Example: `vault write auth/userpass/users/ismet token_policies="secrets-mgmt"`
+3. Assign to an entity in identity secrets engine
+	- Example: `vault write identity/entity/name/ned policies="secrets-mgmt"`
+
+	
+
+
+### Parameter Constraints
+
+Vault policies can be further restricted
+
+1. `required_parameters` - List of parameters that must be set
+	- **Example**: Requires users to create `secret/foo` with "bar" and "baz"
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				required_parameters = ["bar", "baz"]
+			}
+			```
+2. `allowed_parameters` - Keys and values taht are permitted on the given path
+	- **Example**: Allows users to create `secret/foo` with ONLY "bar" with "bar" containing ANY value
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				allowed_parameters = {
+					"bar" = []
+				}
+			}
+			```
+	- **Example**: Allows users to create `secret/foo` with ONLY "bar" with "bar" containing ONLY "zip" and "zap"
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				allowed_parameters = {
+					"bar" = ["zip", "zap"]
+				}
+			}
+			```
+	- **Example**: Allows users to create `secret/foo` with any key and value, but if user creates "bar", it must be "zip" or "zap"
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				allowed_parameters = {
+					"bar" = ["zip", "zap"]
+					"*" = []
+				}
+			}
+			```
+
+
+3. `denied_parameters` - Blacklist of parameters and values (Supersedes `allowed_parameters`)
+	- **Example**: Allows users to create "secret/foo" with any parameter but not named "bar"
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				denied_parameters = {
+					"bar" = []
+				}
+			}
+			```
+	- **Example**: Allows users to create "secret/foo" with parameter named "bar", which cannot contain "zip" or "zap"
+		- ```hcl
+			path "secret/foo" {
+				capabilities = ["create"]
+				denied_parameters = {
+					"bar" = ["zip", "zap"]
+				}
+			}
+			```
+
+### Require Response Wrapping TTLs (Time to Live)
+
+- See: https://www.vaultproject.io/docs/concepts/policies#required-response-wrapping-ttls
+
+
+
+## Tokens
+
+- Authentication within Vault
+- Tokens are a collection of data used to access Vault
+- Used directly or via auth methods (dynamically generated)
+- Tokens are mapped to policies and metadata for auditing purposes
+
+### Creating Tokens
+
+Tokens can be created in the following ways:
+
+1. **Auth method** - Tokens are generated by an auth method
+2. **Parent token** - Use existing token to generate a child token
+3. **Root token** - Requires a special process to generate
+	- Can do ANYTHING
+	- Does not expire
+	- Created:
+		1. Initialize Vault server
+		2. Existing root token
+		3. Using `operator` command
+	- *Revoke it as soon as possible / As soon as action is completed*
+	- Why create a root token?
+		1. Perform initial vault setup
+		2. If main auth method is not available
+		3. Emergency situation where root token is needed
+
+### Token Properties
+
+- `id` - Unique token ID
+- `accessor` - A value to use lookup the token, without needing to use it
+- `type` - What type of token it is, "service" or "batch"
+- `policies` - List of policies that the token is allowed to access
+- `ttl` - Time to live of the token. How long will it be valid for.
+- `orphaned` - Whether the token has a parent token or is a stand-alone
+
+### Token Accessor
+
+- Only able to view token properties, cannot retrieve the ID of the token
+- View capabilities on a given path
+- Used to renew or revoke a token
+- Some situation you may need it:
+	- Something may only need ability to revoke a token and check status of child tokens
+	- View list of all tokens issued, like in `auth/token/accessors`
+	- Audit token usage by accessor in audit log. ID won't be seen
+
+### Working with Tokens
+
+- Create a new token
+	- `vault token create [OPTIONS]`
+		- Example: `vault token create -policy=my-policy -ttl=60m`
+- View token properties
+	- `vault token lookup [OPTIONS] [ACCESSOR or ID]`
+	    - Example: `vault token lookup -accessor=FJKD0870sdfjlhjsdf07sdfY`
+	- Can also view your own token
+		- `vault token lookup`
+- Check capabilities/permissions for a specific path
+	- `vault token capabilities TOKEN PATH`
+		- Example: `vault token capabilities x.TG08098SLDLFHlsdhflsdhSDFI secret/foo`
+- Renew a token
+	- `vault token renew [OPTIONS] [ACCESSOR or ID]`
+		- Example: `vault token renew -increment=30m -accessor=FJKD0870sdfjlhjsdf07sdfY`
+- Revoke a token
+	- `vault token revoke [OPTIONS] [ACCESSOR or ID]`
+		- Example: `vault token revoke -accessor=FJKD0870sdfjlhjsdf07sdfY`
+
+
+### Token Types and LifeCycle
 
 
 
@@ -381,3 +559,12 @@ TODO
 
 
 
+## System Backend
+
+- System Backend is mounted at `/sys`
+- Cannot be disabled or moved
+- List of available system backends can be seen here: https://www.vaultproject.io/api-docs/system
+- Examples
+	- `/sys/mounts` - Used to manage secrets engines in Vault
+	- `/sys/monitor` - Used to receive streaming logs from the Vault server
+	- `/sys/audit` - Used to list, enable, and disable audit devices
