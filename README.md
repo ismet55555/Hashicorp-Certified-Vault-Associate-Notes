@@ -12,6 +12,8 @@ TODO
 
 ## Installing Vault
 
+**Docs:** https://learn.hashicorp.com/tutorials/vault/getting-started-install
+
 - Windows
 
   - `choco install vault`
@@ -25,8 +27,8 @@ TODO
 
 - Ubuntu/Debian:
   - ```bash
-      curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-      sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     sudo apt-get update && sudo apt-get install vault
     ```
 
@@ -65,7 +67,7 @@ TODO
 2. Browser UI
 3. API
 
-!!! danger `root` token with root policy can do ANYTHING in vault
+> **Note:** `root` token with root policy can do ANYTHING in vault
 
 ## Environment Variables
 
@@ -89,7 +91,7 @@ TODO
 - Uses API on backend (as everything else that interacts with vault)
 - Not enabled by default
 - Runs on the same port as API
-- Basic console withing the UI for basic vault commands
+- Basic console within the UI for basic vault commands
 - Getting to the UI
   1. Navigate to `<VAULT HOST>:<PORT>/ui`
      - Example: http://127.0.0.1:8200/ui
@@ -126,7 +128,7 @@ TODO
 
 ### Choosing Auth Method
 
-- Who is going to acces Vault?
+- Who is going to access Vault?
   - External/Internal
   - Human/Machine
 - How are they going to access it?
@@ -138,7 +140,8 @@ TODO
 
 ### Auth Method: Userpass
 
-- https://www.vaultproject.io/docs/auth/userpass
+**Docs:** https://www.vaultproject.io/docs/auth/userpass
+
 - For human operators
 - Composed of username and password only
 - Enable userpass:
@@ -150,7 +153,8 @@ TODO
 
 ### Auth Method: AppRole
 
-- https://www.vaultproject.io/docs/auth/approle
+**Docs:** https://www.vaultproject.io/docs/auth/approle
+
 - Used for machines and apps
 - Consists of RoleID (Username) and SecretID (password)
 - Vault server push secret ID to the client, or have client hold secretID when it boots up
@@ -176,7 +180,7 @@ TODO
     - Need `role_id`
       - `vault read auth/approle/role/<ROLE_NAME>/role-id`
     - Need `secret_id`
-      - `vault write auth/approle/role/<ROLE_NAME>/secret-id`
+      - `vault write -force auth/approle/role/<ROLE_NAME>/secret-id`
       - Note the `write`, this generates data
       - Generated on the fly, or can specify the `secret_id`
       - This yields `secret_id`, `secret_id_accessor`, and `secret_id_ttl`
@@ -191,8 +195,7 @@ TODO
 
 TODO
 
-!!! tip Exam Tip
-Exam will cover choosing the correct auth method for a given scenario
+> **Note:** Exam will cover choosing the correct auth method for a given scenario
 
 ### Configuration
 
@@ -214,33 +217,38 @@ Exam will cover choosing the correct auth method for a given scenario
   - `vault auth enable [options] TYPE`
   - Enable with custom path: `vault auth enable -path=globopass userpass`
   - Enable userpass: `vault auth enable userpass`
+  - Enable approle: `vault auth enable approle`
 - Tune:
   - `vault auth tune [options] PATH`
   - Example: `vault auth tune -description="First userpass" globopass/`
 - Disable:
-  - Will remove all info stored by this auth method
+  - Warning: This will remove all info stored by this auth method
   - `vault auth disable [options] PATH`
 
-### Using Auth Method
+### Authenticating (Logging in)
 
-- CLI, UI, or API
-- `vault login`
+- Using `vault login`
+  - **Docs:** https://www.vaultproject.io/docs/commands/login
   - For interactive methods view user
   - Will result in token and token information
   - `vault login`
-    - Will prompt for token
+    - Will prompt for token in terminal
+  - `vault login [TOKEN]`
+	- Will use provided token
+	- Example:
+		- `vault login s.2f3c5L1MHtnqbuNCbx90utmC`
   - `vault login [options] [AUTH METHOD KEY-VALUE PAIRS]`
     - Depends on the auth method used
-    - Example: `vault login userpass username=<USERNAME> password=<PASSWORD>`
-- `vault write`
+    - Examples:
+		- `vault login userpass username=<USERNAME> password=<PASSWORD>`
+		- `vault login -method=github -path=github-prod`
+- Using `vault write`, targeting a particular auth method path
   - For any other method (AppRole, LDAP, etc)
   - `vault write [options] PATH [KEY-VALUE PAIRS]`
-    - Depends on the auth method used
-    - Example: `vault write auth/userpass/login/ismet password=<PASSWORD>`
+  - Depends on the auth method used
+  - Examples:
+  	- `vault write auth/userpass/login/ismet password=<PASSWORD>`
 
-!!! tip
-Using CLI: `vault auth`
-Interacting with auth methods: `vault login` or `vault write`
 
 ### Disable Auth Method
 
@@ -249,6 +257,8 @@ Interacting with auth methods: `vault login` or `vault write`
   - Note that we did not have to spacify path (auth/approle), since we are using `auth`
 
 ## Vault Policies
+
+**Docs:** https://www.vaultproject.io/docs/concepts/policies
 
 - As everything, policies are path based
 - Grant or forbid access to certain paths and operations (what you can do in Vault)
@@ -259,81 +269,89 @@ Interacting with auth methods: `vault login` or `vault write`
 - No internal versioning of policies
   - Make you back up some other way
 
-### Root Policy
+### `root` Policy
 
 - Can do ANYTHING
 - Careful who gets assigned this policy!
 
-### Default Policy
+### `default` Policy
 
-- Allow tokens to look up their own properties
+The default policy on a token allows the following:
+
+- Look up their own properties
   - `path "auth/token/lookup-self" { ... }`
-- Allow tokens to renew themselves
+- Renew themselves
   - `path "auth/token/renew-self" { ... }`
-- Allow tokens to revoke themselves
+- Revoke themselves
   - `path "auth/token/revoke-self" { ... }`
-- Allow tokens to look up its own capabilities on a path
+- Look up its own capabilities on a path
   - `path "sys/capabilities-self" { ... }`
-- Allow a token to look up its own entity by id or name
+- Look up its own entity by id or name
   - `path "identity/entity/id/{{identity.entity.id}}" { ... }`
 
 ### Policy Syntax
 
-- HCL (preferred) or JSON
-- Policy Path: Where the policy is applied
-- Policy Capabilities: What acations are allowed
-- Basic path expression:
-  - `path "some-path/in/valut"`
-- Two wildcards:
-  1.  glob `*`
-      - Added at the END of a path, matches extension of path (This is not RegEx)
-      - Example: `path "some-path/*"` -> `path "some-path/something"` and `path "some-path/something/else"`
-  2.  segment `+`
-      - Placeholder WITHIN a path, matches any number of characters
-      - Example: `path "secrets/+/blah"` -> `path "secrets/something/blah"` and `path "secrets/cool/blah"`
-  - **NOTE:** `"secret/foo"` would only address `secret/foo`, and nothing under it
+**Docs:** https://www.vaultproject.io/docs/concepts/policies#policy-syntax
+
+- HashiCorp Configuration Language (HCL) *(preferred)* or JSON
+- *Policy Path* - Where the policy is applied
+- *Policy Capabilities* - What actions are allowed
+- Basic path expression: `path "some-path/in/valut"`
+- Two wildcards are available for path expressions:
+  1.  Glob: `*`
+      - Always added at the END of a path expression
+	  - This should match the extension of path (Note: This is not RegEx)
+      - Example: 
+	  	- `path "some-path/*"` can evaluate as `path "some-path/something"` and `path "some-path/something/else"`
+  2.  Segment: `+`
+      - Always added WITHIN a path
+	  - This should match any number of characters for a path segment
+      - Example: 
+	  	- `path "secrets/+/blah"` can evaluate as `path "secrets/something/blah"` and `path "secrets/cool/blah"`
+  - Unless wildcards are specified, the expression is only for the specific path
+  	-`"secret/foo"` would only address `secret/foo`, and nothing under it
 
 #### Examples
 
-- Example: Grant read access to secret `secret/foo`
+- **Example** Grant read access to only secret `secret/foo`
   - ```hcl
     path "secret/foo" {
     	capabilities = ["read", "list"]
     }
     ```
 - Wildcard `*` addresses all downstream paths
-  - Example: Grant read access to all secrets
+  - **Example** Grant read and list access to all secrets
   - ```hcl
     path "secret/*" {
     	capabilities = ["read", "list"]
     }
     ```
-- Note that any sub path can be overridden by setting a policy:
+- Note that any sub-path can be overridden by setting a policy:
   - ```hcl
     path "secret/super-secret" {
     	capabilities = ["deny"]
     }
     ```
 - Policies rules can be set up to allow, disallow, or require policy parameters
-  - Example: `secret/restricted` can only contain any value for `foo`, and `zip` or `zap` for `bar`
+  - **Example** `secret/restricted` can only contain any value for `foo`, and values `zip` or `zap` for `bar`
   - ```hcl
     path "secret/restricted" {
     	capabilities = ["create"]
     	allowed_parameters = {
-    		"foo" = []
+    		"foo" = []				# <-- Allow any value
     		"bar" = ["zip", "zap"]
     	}
     }
     ```
 - Can use "glob" patterns / wildcard to match paths
-  - Example: `secret/foo/*` will match `secret/foo/bar`
+  - **Example** `secret/foo/*` can match `secret/foo/bar` or even `secret/foo/bar/baz`
   - ```hcl
     path "secret/foo/*" {
     	capabilities = ["read", "list"]
     }
     ```
-- Any number of characters that are bounded withing a single path segment, use `+`
-  - Example: Permit reading `secret/foo/bar/teamb`, `secret/bar/foo/teamb`, etc.
+- Any number of characters that are bounded within a single path segment, use `+`
+  - **Example** Permit reading `secret/foo/bar/teamb`, `secret/bar/foo/teamb`, etc.
   - ```hcl
     path "secret/+/+/teamb" {
     	capabilities = ["read"]
@@ -342,29 +360,34 @@ Interacting with auth methods: `vault login` or `vault write`
 
 ### Templated Policies (Parameters)
 
-- Dynamic way of defining paths in policies
-- Using `{{ }}` to let vault know that you are adding a parameter, then adding the path to the parameter
-  - Example: Resolve the name of the entity
-    - `path "secret/{{identity.entity.name}}/*" { ... }`
-- **NOTE:** Currently, the only source for parameters is `identity` secrets engine
+**Docs:** https://www.vaultproject.io/docs/concepts/policies#templated-policies
 
-### Capabilities
+- Dynamic way of defining paths in policies
+- These are used within the policy files
+- Using `{{ }}` to let vault know that you are adding a parameter, then adding the path to the parameter
+  - **Example:** Insert the name of the entity
+    - `path "secret/{{identity.entity.name}}/*" { ... }`
+- **IMPORTANT:** Currently, the only source for parameters is `identity` secrets engine
+
+### Policy Capabilities
+
+**Docs:** https://www.vaultproject.io/docs/concepts/policies#capabilities
 
 - Follows CRUD semantics (Create, Read, Update, Delete)
-  - `create` - Creating data at the given path (similar to `update`, which is also `POST/PUT` call)
-  - `read` - Reading data at the given path
-  - `update` - Changing data at given path
-  - `delete` - Deleting data at given path
+  - `create` - Creating data at the given path (similar to `update`) (REST `POST/PUT` request)
+  - `read` - Reading data at the given path (REST `GET` request)
+  - `update` - Changing data at given path (REST `POST/PUT` request)
+  - `delete` - Deleting data at given path (REST `DELETE` request)
 - Additional capabilities:
-  - `list` - Listing data at given path. No access to key data.
+  - `list` - Listing data at given path. No access to key data (REST `LIST` request)
   - `sudo` - Access to paths that are _root-protected_
-  - `deny` - Disallow access to given path. Overrides any other action.
+  - `deny` - Disallow access to given path or path pattern. Overrides any other allow action
 
-### Policy Rules
+### Policy Evaluation Rules
 
 - Policy that Vault applies are determined by the most-specific match available
-- If same pattern appears in multiple policies, the union of both is taken
-  - Example: Combine `[read, list]` with `[create]`
+- If same policy path pattern appears in multiple policies, the union of both is taken
+  - **Example:** Combine `[read, list]` with `[create]` is `[read, list, create]`
 - If different patterns appear in multiple policies, the highest-precedence one is taken
 
 ### Working with Policies
@@ -373,15 +396,18 @@ Interacting with auth methods: `vault login` or `vault write`
   - `vault policy list`
 - Read the contents of a policy
   - `vault policy read [OPTIONS] [POLICY NAME]`
-    - Example: `vault policy read secrets-mgmt`
+    - **Example:** `vault policy read secrets-mgmt`
 - Write a new policy or update an existing policy
-  l. `vault policy write [OPTIONS] [POLICY NAME] [POLICY FILE]` - Example: `vault policy write secrets-mgmt policy.hcl` 2. `vault policy write [OPTIONS] [POLICY NAME] -` - Example: `cat policy.hcl | vault policy write secrets-mgmt -`
+  - Using a File: `vault policy write [OPTIONS] [POLICY NAME] [POLICY FILE]`
+	- **Example:** `vault policy write secrets-mgmt policy.hcl`
+  - Using Standard In: `vault policy write [OPTIONS] [POLICY NAME] -`
+	- **Example:** `cat policy.hcl | vault policy write secrets-mgmt -`
 - Delete a policy
   - `vault policy delete [OPTIONS] [POLICY NAME]`
-    - Example: `vault policy delete secrets-mgmt`
+    - **Example:** `vault policy delete secrets-mgmt`
 - Format the policy (more readable syntx)
   - `vault policy fmt [OPTIONS] [POLICY FILE]`
-    - Example: `vault policy fmt policy.hcl`
+    - **Example:** `vault policy fmt policy.hcl`
 
 ### Assigning Policies
 
@@ -397,19 +423,18 @@ The policy has to already be created and active in Vault to be assigned.
 
 ### Parameter Constraints
 
-Vault policies can be further restricted
+**Docs:** https://www.vaultproject.io/docs/concepts/policies#fine-grained-control
 
 1. `required_parameters` - List of parameters that must be set
-   - **Example**: Requires users to create `secret/foo` with "bar" and "baz"
+   - **Example**: Requires users to create sub-items within `secret/foo` with `bar` and `baz`
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
        	required_parameters = ["bar", "baz"]
        }
        ```
-2. `allowed_parameters` - Keys and values taht are permitted on the given path
-
-   - **Example**: Allows users to create `secret/foo` with ONLY "bar" with "bar" containing ANY value
+2. `allowed_parameters` - Keys and values that are permitted on the given path
+   - **Example**: Allows users to create `secret/foo` with ONLY `bar`, with `bar` containing ANY value
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
@@ -418,7 +443,7 @@ Vault policies can be further restricted
        	}
        }
        ```
-   - **Example**: Allows users to create `secret/foo` with ONLY "bar" with "bar" containing ONLY "zip" and "zap"
+   - **Example**: Allows users to create `secret/foo` with ONLY `bar`, with `bar` containing ONLY `zip` and `zap`
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
@@ -427,7 +452,7 @@ Vault policies can be further restricted
        	}
        }
        ```
-   - **Example**: Allows users to create `secret/foo` with any key and value, but if user creates "bar", it must be "zip" or "zap"
+   - **Example**: Allows users to create `secret/foo` with any key and value, but if user creates `bar`, it must be `zip` or `zap`
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
@@ -439,7 +464,7 @@ Vault policies can be further restricted
        ```
 
 3. `denied_parameters` - Blacklist of parameters and values (Supersedes `allowed_parameters`)
-   - **Example**: Allows users to create "secret/foo" with any parameter but not named "bar"
+   - **Example**: Allows users to create `secret/foo` with any parameter but not named `bar`
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
@@ -448,7 +473,7 @@ Vault policies can be further restricted
        	}
        }
        ```
-   - **Example**: Allows users to create "secret/foo" with parameter named "bar", which cannot contain "zip" or "zap"
+   - **Example**: Allows users to create `secret/foo` with parameter named `bar`, which cannot contain `zip` or `zap`
      - ```hcl
        path "secret/foo" {
        	capabilities = ["create"]
@@ -460,25 +485,27 @@ Vault policies can be further restricted
 
 ### Require Response Wrapping TTLs (Time to Live)
 
-- See: https://www.vaultproject.io/docs/concepts/policies#required-response-wrapping-ttls
+**Docs:**: https://www.vaultproject.io/docs/concepts/policies#required-response-wrapping-ttls
 
 ## Tokens
 
-- Authentication within Vault
+**Docs:**: https://www.vaultproject.io/docs/concepts/tokens
+
+- Used for authentication within Vault
 - Tokens are a collection of data used to access Vault
 - Used directly or via auth methods (dynamically generated)
-- Tokens are mapped to policies and metadata for auditing purposes
+- Tokens are mapped to policies for authorization and metadata for auditing purposes
 
 ### Creating Tokens
 
 Tokens can be created in the following ways:
 
-1. **Auth method** - Tokens are generated by an auth method
-2. **Parent token** - Use existing token to generate a child token
+1. **Auth method** - Tokens are generated by an auth method (userpass, github, aws, etc)
+2. **Parent token** - Using existing token to generate a child token
 3. **Root token** - Requires a special process to generate
-   - Can do ANYTHING
+   - Can do ANYTHING (Dangerous)
    - Does not expire
-   - Created:
+   - Created via the following:
      1. Initialize Vault server
      2. Existing root token
      3. Using `operator` command
@@ -499,33 +526,36 @@ Tokens can be created in the following ways:
 
 ### Token Accessor
 
-- Only able to view token properties, cannot retrieve the ID of the token
+**Docs:** https://www.vaultproject.io/docs/concepts/tokens#token-accessors
+
+- Only able to view token properties (metadata), cannot retrieve the actual ID of the token
 - View capabilities on a given path
-- Used to renew or revoke a token
+- Used for token management such as renew or revoke a token
+	- More token management: https://www.idkrtm.com/hashicorp-vault-managing-tokens/
 - Some situation you may need it:
-  - Something may only need ability to revoke a token and check status of child tokens
-  - View list of all tokens issued, like in `auth/token/accessors`
+  - Some program may only need ability to revoke a token and check status of child tokens
+  - View list of all tokens issued, like: `vault list auth/token/accessors`
   - Audit token usage by accessor in audit log. ID won't be seen
 
 ### Working with Tokens
 
 - Create a new token
   - `vault token create [OPTIONS]`
-    - Example: `vault token create -policy=my-policy -ttl=60m`
+    - **Example:** `vault token create -policy=my-policy -ttl=60m`
 - View token properties
   - `vault token lookup [OPTIONS] [ACCESSOR or ID]`
-    - Example: `vault token lookup -accessor=FJKD0870sdfjlhjsdf07sdfY`
+    - **Example:** `vault token lookup -accessor=FJKD0870sdfjlhjsdf07sdfY`
   - Can also view your own token
     - `vault token lookup`
 - Check capabilities/permissions for a specific path
   - `vault token capabilities TOKEN PATH`
-    - Example: `vault token capabilities x.TG08098SLDLFHlsdhflsdhSDFI secret/foo`
+    - **Example:** `vault token capabilities x.TG08098SLDLFHlsdhflsdhSDFI secret/foo`
 - Renew a token
   - `vault token renew [OPTIONS] [ACCESSOR or ID]`
-    - Example: `vault token renew -increment=30m -accessor=FJKD0870sdfjlhjsdf07sdfY`
+    - **Example:** `vault token renew -increment=30m -accessor=FJKD0870sdfjlhjsdf07sdfY`
 - Revoke a token
   - `vault token revoke [OPTIONS] [ACCESSOR or ID]`
-    - Example: `vault token revoke -accessor=FJKD0870sdfjlhjsdf07sdfY`
+    - **Example:** `vault token revoke -accessor=FJKD0870sdfjlhjsdf07sdfY`
 
 ### Token Types
 
