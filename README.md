@@ -94,7 +94,7 @@ TODO
 - Basic console within the UI for basic vault commands
 - Getting to the UI
   1. Navigate to `<VAULT HOST>:<PORT>/ui`
-     - Example: http://127.0.0.1:8200/ui
+     - **Example:** http://127.0.0.1:8200/ui
   2. Enter your token
 
 ## Vault API
@@ -103,7 +103,7 @@ TODO
 - Used by UI and CLI
 - Any request tools (ie. curl)
 - Need to specify your token for each request
-- Example:
+- **Example:**
   - `curl --header "X-Vault-Token: $root_token" --request GET $VAULT_ADDR/v1/sys/host-info`
 
 ## Authentication Methods
@@ -220,7 +220,7 @@ TODO
   - Enable approle: `vault auth enable approle`
 - Tune:
   - `vault auth tune [options] PATH`
-  - Example: `vault auth tune -description="First userpass" globopass/`
+  - **Example:** `vault auth tune -description="First userpass" globopass/`
 - Disable:
   - Warning: This will remove all info stored by this auth method
   - `vault auth disable [options] PATH`
@@ -234,26 +234,25 @@ TODO
   - `vault login`
     - Will prompt for token in terminal
   - `vault login [TOKEN]`
-	- Will use provided token
-	- Example:
-		- `vault login s.2f3c5L1MHtnqbuNCbx90utmC`
+  - Will use provided token
+  - **Example:**
+    - `vault login s.2f3c5L1MHtnqbuNCbx90utmC`
   - `vault login [options] [AUTH METHOD KEY-VALUE PAIRS]`
     - Depends on the auth method used
     - Examples:
-		- `vault login userpass username=<USERNAME> password=<PASSWORD>`
-		- `vault login -method=github -path=github-prod`
+    - `vault login userpass username=<USERNAME> password=<PASSWORD>`
+    - `vault login -method=github -path=github-prod`
 - Using `vault write`, targeting a particular auth method path
   - For any other method (AppRole, LDAP, etc)
   - `vault write [options] PATH [KEY-VALUE PAIRS]`
   - Depends on the auth method used
   - Examples:
-  	- `vault write auth/userpass/login/ismet password=<PASSWORD>`
-
+    - `vault write auth/userpass/login/ismet password=<PASSWORD>`
 
 ### Disable Auth Method
 
 - `vault auth disable [options] PATH`
-  - Example: `vault auth disable approle/`
+  - **Example:** `vault auth disable approle/`
   - Note that we did not have to spacify path (auth/approle), since we are using `auth`
 
 ## Vault Policies
@@ -293,23 +292,22 @@ The default policy on a token allows the following:
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#policy-syntax
 
-- HashiCorp Configuration Language (HCL) *(preferred)* or JSON
-- *Policy Path* - Where the policy is applied
-- *Policy Capabilities* - What actions are allowed
+- HashiCorp Configuration Language (HCL) _(preferred)_ or JSON
+- _Policy Path_ - Where the policy is applied
+- _Policy Capabilities_ - What actions are allowed
 - Basic path expression: `path "some-path/in/valut"`
 - Two wildcards are available for path expressions:
   1.  Glob: `*`
       - Always added at the END of a path expression
-	  - This should match the extension of path (Note: This is not RegEx)
-      - Example: 
-	  	- `path "some-path/*"` can evaluate as `path "some-path/something"` and `path "some-path/something/else"`
+  - This should match the extension of path (Note: This is not RegEx)
+    - **Example:**
+    - `path "some-path/*"` can evaluate as `path "some-path/something"` and `path "some-path/something/else"`
   2.  Segment: `+`
       - Always added WITHIN a path
-	  - This should match any number of characters for a path segment
-      - Example: 
-	  	- `path "secrets/+/blah"` can evaluate as `path "secrets/something/blah"` and `path "secrets/cool/blah"`
-  - Unless wildcards are specified, the expression is only for the specific path
-  	-`"secret/foo"` would only address `secret/foo`, and nothing under it
+  - This should match any number of characters for a path segment
+    - **Example:**
+    - `path "secrets/+/blah"` can evaluate as `path "secrets/something/blah"` and `path "secrets/cool/blah"`
+  - Unless wildcards are specified, the expression is only for the specific path -`"secret/foo"` would only address `secret/foo`, and nothing under it
 
 #### Examples
 
@@ -399,9 +397,9 @@ The default policy on a token allows the following:
     - **Example:** `vault policy read secrets-mgmt`
 - Write a new policy or update an existing policy
   - Using a File: `vault policy write [OPTIONS] [POLICY NAME] [POLICY FILE]`
-	- **Example:** `vault policy write secrets-mgmt policy.hcl`
+  - **Example:** `vault policy write secrets-mgmt policy.hcl`
   - Using Standard In: `vault policy write [OPTIONS] [POLICY NAME] -`
-	- **Example:** `cat policy.hcl | vault policy write secrets-mgmt -`
+  - **Example:** `cat policy.hcl | vault policy write secrets-mgmt -`
 - Delete a policy
   - `vault policy delete [OPTIONS] [POLICY NAME]`
     - **Example:** `vault policy delete secrets-mgmt`
@@ -415,11 +413,11 @@ The policy has to already be created and active in Vault to be assigned.
 
 1. Associate directly with a token
    - Assign a policy at token creation
-   - Example: `vault token create -policy=secrets-mgmt`
+   - **Example:** `vault token create -policy=secrets-mgmt`
 2. Assign to a user in userpass
-   - Example: `vault write auth/userpass/users/ismet token_policies="secrets-mgmt"`
+   - **Example:** `vault write auth/userpass/users/ismet token_policies="secrets-mgmt"`
 3. Assign to an entity in identity secrets engine
-   - Example: `vault write identity/entity/name/ned policies="secrets-mgmt"`
+   - **Example:** `vault write identity/entity/name/ned policies="secrets-mgmt"`
 
 ### Parameter Constraints
 
@@ -434,6 +432,7 @@ The policy has to already be created and active in Vault to be assigned.
        }
        ```
 2. `allowed_parameters` - Keys and values that are permitted on the given path
+
    - **Example**: Allows users to create `secret/foo` with ONLY `bar`, with `bar` containing ANY value
      - ```hcl
        path "secret/foo" {
@@ -531,7 +530,7 @@ Tokens can be created in the following ways:
 - Only able to view token properties (metadata), cannot retrieve the actual ID of the token
 - View capabilities on a given path
 - Used for token management such as renew or revoke a token
-	- More token management: https://www.idkrtm.com/hashicorp-vault-managing-tokens/
+  - More token management: https://www.idkrtm.com/hashicorp-vault-managing-tokens/
 - Some situation you may need it:
   - Some program may only need ability to revoke a token and check status of child tokens
   - View list of all tokens issued, like: `vault list auth/token/accessors`
@@ -581,7 +580,7 @@ Tokens can be created in the following ways:
    - Static lifetime - Once created and TTL set, cannot be renewed
    - Has no child tokens
    - Begins with **"b."** in token ID
-   - Example:
+   - **Example:**
      - Create: `vault token create -type=batch -policy=default -ttl=30m`
 
 3. Token Type: **Periodic**
@@ -591,7 +590,7 @@ Tokens can be created in the following ways:
    - TTL is set to period at creation and renewals
    - Requires root (`sudo`) privileges to create
    - Renewals cannot exceed what has been provided by `-period`
-   - Example:
+   - **Example:**
      - Create: `vault token create -policy=default -period=2h`
      - Renew: `vault token renew -increment=60m s.YvR0cqzXsDDdCne0w28QZ4kr`
 
@@ -610,16 +609,16 @@ Tokens can be created in the following ways:
 #### Working with Token Lifetime
 
 - Renew a token
-  - `vault token renew [OPTIONS] [ACCESSOR or ID] [ -increment=<DURATION> ]
-    - Example: Extend the currently active token by 30 minutes
+  - `vault token renew [OPTIONS] [ACCESSOR or ID] [ -increment=<DURATION> ]`
+    - **Example:** Extend the currently active token by 30 minutes
       - `vault token renew -increment=30m`
-    - Example: Extend another token by 30 minutes
+    - **Example:** Extend another token by 30 minutes
       - `vault token renew -increment=30m -accessor=FJKD0870sdfjlhjsdf07sdfY`
 - Revoke a token
   - `vault token revoke [OPTIONS] [ACCESSOR or ID]`
-    - Example: Revoke the currently active token
+    - **Example:** Revoke the currently active token
       - `vault token revoke -self`
-    - Example: Revoke another token
+    - **Example:** Revoke another token
       - `vault token revoke -accessor=FJKD0870sdfjlhjsdf07sdfY`
 
 #### Setting Maximum Token TTL
@@ -631,7 +630,7 @@ Tokens can be created in the following ways:
    - System-wide setting for maximum TTL
    - Defined within Vault configuration file
    - Dynamically evaluated (will check against it constantly)
-   - Example:
+   - **Example:**
      - `vault server -config /etc/vault/config.hcl`
 
 2. Mount max TTL for specific auth method
@@ -649,7 +648,7 @@ Tokens can be created in the following ways:
    - Change with `write` command
    - Overrides system and mount max TTL
    - MUST be less than system and mount max TTL
-   - Example:
+   - **Example:**
      - `vault write auth/userpass/users/ismet max-lease-ttl=72h`
      - `vault write auth/userpass/users/bob token-max-ttl=72h password=sEcReT`
 
@@ -661,37 +660,107 @@ Tokens can be created in the following ways:
 - Store, generate, or encrypt data
 - Broad categories: **Dynamic** and **Static**
 - General Secrets engine categories:
-	- **Cloud** - AWS, Azure, GCP, etc.
-	- **Database** - MSSQL, PostgreSQL, MySQL, etc.
-	- **Internal** - Key/Value, Identity, Transit, etc.
-	- **Identity** - Active Directory, LDAP, etc.
-	- **Certificate** - SSH, PKI, etc.
-	- **Tokens** - Consul, Nomad 
+  - **Cloud** - AWS, Azure, GCP, etc.
+  - **Database** - MSSQL, PostgreSQL, MySQL, etc.
+  - **Internal** - Key/Value, Identity, Transit, etc.
+  - **Identity** - Active Directory, LDAP, etc.
+  - **Certificate** - SSH, PKI, etc.
+  - **Tokens** - Consul, Nomad
+- All engines are enabled on `/sys/mounts` path`
+- When enabling, if no path is provided, it will default to engine name
+- Secrets engines can be moved
+  - Any existing leases will be revoked
+  - May impact policies (which are based on paths)
+- Engines can be tuned and configured
+  - Tuning settings are common for all engines
+  - Configuration settings are specific to the engine
 
 > **Note:** Secret engine specifics are not needed for the certification exam, only how to generally use them.
 
-### Identity Engine
+### Types of Secrets
 
-**Docs:** https://www.vaultproject.io/docs/secrets/identity
+- **Static secrets**
 
-- Maintains clients who are recognized by Vault
-- "Clients" are users or applications that have been authenticated by Vault
-- Identity engine tracks those clients internally within Vault
-- Enabled by default
-- Cannot be disabled or moved
-- Cannot enable multiple instances/paths of the identity engines
-- Each client is a `Entity`
-	- Entry within the identity engine that represents a client
-- Any entity can have multiple `Aliases`
-	- For example, a single user who has accounts in both GitHub and LDAP, 
-	can be mapped to a  single entity in Vault that has 2 aliases, one 
-	of type GitHub and one of type LDAP.
-- Can place entities in different groups to manage policy assignments to entities
+  - Store existing data securely
+  - You already have this data, and Vault needs to manage it and access to it
+  - Manual lifecycle management
+  - Manually load new versions of secret to a secret engine
+  - **Example:**
+    - Key/Value secret engine
 
+- **Dynamic Secrets**
+  - Generated data on demand
+  - Lease issued for each secret (TTL)
+  - Automatic lifecycle management
+  - Majority of secrets engines are dynamic
 
-### Cubbyhole Engine
+### Working with Secrets Engines
 
-**Docs:** https://www.vaultproject.io/docs/secrets/cubbyhole 
+- List existing secret engines
+  - `vault secrets list`
+- Enable a new secrets engine
+  - `vault secrets enable [OPTIONS] TYPE`
+  - **Example:**
+    - `vault secrets enable -version=2 kv`
+    - `vault secrets enable -path=CompanyData database`
+- Tune a secrets engine settings
+  - `vault secrets tune [OPTIONS] PATH`
+  - **Example:**
+    - `vault secrets tune -max-lease-ttl=72h kv`
+    - `vault secrets tune -description="Our cool database engine" CompanyData`
+- Move a secrets engine
+  - `vault secrets move [OPTIONS] SOURCE DESTINATION`
+  - **Example:**
+    - `vault secrets move CompanyData CompanyDataPrivate`
+- Disable a secrets engine
+  - `vault secrets disable [OPTIONS] PATH`
+  - **Example:**
+    - `vault secrets disable CompanyData`
+- Show secret engine help
+  - `vault path-help /sys/mounts/<engine>`
+  - **Example:**
+    - `vault path-help /sys/mounts/CompanyData`
+
+### Response Wrapping
+
+**Docs:** https://www.vaultproject.io/docs/concepts/response-wrapping
+
+- Provides mechanism for information sharing between many environments
+- Vault takes response it would have sent to a client and insert it into the `cubbyhole` of
+  a single-use token, returning that single-use token instead
+- Response it wrapped by the token, retrieving it requires an unwrap operation
+- Response wrapping provides:
+
+  - Value transmitted is not the actual secret but a referenc to the secret (response-wrapping token)
+  - Only single party can unwrap the token and see what's inside
+  - Limits the lifetime of secret exposure. If client fails unwrap token, token can expire quickly
+
+- Wrapped token creation
+
+  - Use `wrap-ttl` via CLI
+  - Use `X-Vault-Wrap-TTL` header via API
+
+- When a response wrap is requested ...
+
+  - **Single-use** token is generated
+  - Original response is stored in a single-use token's cubbyhole
+  - New response is returned with a single-use token
+
+- The client does not have to authenticate to vault, gets instant access to the secret
+  for one time only
+
+- Usage
+  - Request wrapping of any command
+    - `vault command -wrap-ttl=[DURATION] PATH`
+      **Example:** `vault kv get -wrap-ttl=1h CustomerData/apikeys/d101`
+    - The resulting token (`wrapping_token`) is passed to entity that needs to retrieve that info
+  - Unwrap using the issued wrap token
+    - `vault unwrap [OPTIONS] [TOKEN]`
+    - **Example:** `vault unwrap s.3AGhomXjJt4LeInivNhV1NDJ`
+
+### Secrets Engine: Cubbyhole
+
+**Docs:** https://www.vaultproject.io/docs/secrets/cubbyhole
 
 - Stores arbitrary secrets within Vault, namespaced to a token
 - Paths are scoped per token
@@ -703,34 +772,109 @@ Tokens can be created in the following ways:
 - No versioning for secrets
 - **The root token has no access to the cubbyhole, only its token can access it**
 - Usage:
-	- Write: `vault write cubbyhole/my-secret my-value=s3cr3t`
-	- Read: `vault read cubbyhole/my-secret`
-	- API: Reading via curl
-		- ```bash
-			curl \
-				--header "X-Vault-Token: <TOKEN HERE>" \
-				http://127.0.0.1:8200/v1/cubbyhole/my-secret
-			```
+  - Write: `vault write cubbyhole/my-secret my-value=s3cr3t`
+  - Read: `vault read cubbyhole/my-secret`
+  - API: Reading via curl
+    - ```bash
+      curl \
+      	--header "X-Vault-Token: <TOKEN HERE>" \
+      	http://127.0.0.1:8200/v1/cubbyhole/my-secret
+      ```
 
+### Secrets Engine: Identity
 
-### Types of Secrets
+**Docs:** https://www.vaultproject.io/docs/secrets/identity
 
-- **Static secrets**
-	- Store existing data securely
-	- You already have this data, and Vault needs to manage it and access to it
-	- Manual lifecycle management
-	- Manually load new versions of secret to a secret engine
-	- Example:
-		- Key/Value secret engine
+- Maintains and keeps track of clients who are recognized by Vault
+- "Clients" are users or applications that have been authenticated by Vault
+- Identity engine tracks those clients internally within Vault
+- Enabled by default
+- Cannot be disabled or moved
+- Cannot enable multiple instances/paths of the identity engines
+- Each client is a `Entity`
+  - Entry within the identity engine that represents a client
+- Any entity can have multiple `Aliases`
+  - For example, a single user who has accounts in both GitHub and LDAP,
+    can be mapped to a single entity in Vault that has 2 aliases, one
+    of type GitHub and one of type LDAP.
+- Can place entities in different groups to manage policy assignments to entities
 
-- **Dynamic Secrets**
-	- Generated data on demand
-	- Lease issued for each secret (TTL)
-	- Automatic lifecycle management 
-	- Majority of secrets engines are dynamic
+### Secret Engine: Database
 
+**Docs:** https://www.vaultproject.io/docs/secrets/databases
 
+- Credentials dynamically generated with the database itself
+- Credentials are short-lived
+- Applications/Services request credentials from vault, which in turn generates it through database
+- Also supports static roles, a 1-to-1 mapping between vault roles to username/password
 
+### Secret Engine: Key Value (KV)
+
+**Docs:** https://www.vaultproject.io/docs/secrets/kv
+
+There are two version of thi engine
+
+- **Key Value Version 1**
+
+  - No versioning, last key wins
+  - Faster with fewer storage calls
+  - Deleted items are gone forever
+  - Can be upgraded to version 2
+  - Default version on creation
+
+- **Key Value Version 2**
+
+  - Versioning of past secrets
+  - Possibly less performant
+  - Deleted items and metadata retained, can be recovered
+  - Cannot be downgraded to version 1
+  - Can be specified at creation
+
+- Usage:
+
+  - **Docs:**: https://www.vaultproject.io/docs/secrets/kv/kv-v2#usage
+  - Getting help: `vault kv - help`
+  - Create/Writing a secret:
+    - `vault kv put [OPTIONS] KEY [DATA KEY=VALUE]`
+    - **Example:** `vault kv put CustomerKeys/apikeys/d101 token=1234567890`
+  - Read a secret:
+    - `vault kv get [OPTIONS] KEY`
+    - **Example:** `vault kv get -version=2 CustomerKeys/apikeys/d101`
+  - Listing secrets:
+    - `vault kv list [OPTIONS] PATH`
+    - **Example:** `vault kv list CustomerKeys/apikeys`
+  - Deleting a secret:
+    - `vault kv delete [OPTIONS] KEY`
+    - **Example:** `vault kv delete -versions=1 CustomerKeys/apikeys/d101`
+  - Permanently destroy a secret:
+    - `vault kv destroy [OPTIONS] KEY`
+    - **Example:** `vault kv destroy CustomerKeys/apikeys/d101`
+
+- Example using REST API:
+  - Note the `data` in the path
+    - ```bash
+      curl --header "X-Vault-Token: [VAULT TOKEN]" \
+      http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102
+      ```
+  - Getting a specific version
+    - ```bash
+      curl --header "X-Vault-Token: [VAULT TOKEN]" \
+      http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102?version=1
+      ```
+
+### Secret Engine: Transit
+
+**Docs:** https://www.vaultproject.io/docs/secrets/transit
+
+- Provides encryption as a service
+- Vault doesn't store the data sent to this engine, only the encrypted keys for its actions
+- Supported actions:
+  - Encrypt and decrypt data
+  - Can sign and verify that data
+  - Generate hashes
+  - Create random bytes
+- Relieves burden of proper encryption/decryption
+- Encryption keys that it uses to perform all actions are maintained the Transit secrets engine
 
 
 
