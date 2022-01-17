@@ -2,13 +2,66 @@
 
 <h3 align="center">hashicorp.com/certification/vault-associate</h3>
 
-[TOC]
+
+<!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
+
+<!-- code_chunk_output -->
+
+- [Installing Vault](#installing-vault)
+- [Development Mode](#development-mode)
+  - [Setting up development mode server](#setting-up-development-mode-server)
+- [Interacting with Vault](#interacting-with-vault)
+- [Environment Variables](#environment-variables)
+- [Vault UI](#vault-ui)
+- [Vault API](#vault-api)
+- [Authentication Methods](#authentication-methods)
+  - [Auth Method Categories](#auth-method-categories)
+  - [Choosing Auth Method](#choosing-auth-method)
+  - [Auth Method: Userpass](#auth-method-userpass)
+  - [Auth Method: AppRole](#auth-method-approle)
+  - [Auth Method: AWS](#auth-method-aws)
+  - [Configuration](#configuration)
+  - [Basic Commands](#basic-commands)
+  - [Authenticating (Logging in)](#authenticating-logging-in)
+  - [Disable Auth Method](#disable-auth-method)
+- [Vault Policies](#vault-policies)
+  - [`root` Policy](#root-policy)
+  - [`default` Policy](#default-policy)
+  - [Policy Syntax](#policy-syntax)
+    - [Examples](#examples)
+  - [Templated Policies (Parameters)](#templated-policies-parameters)
+  - [Policy Capabilities](#policy-capabilities)
+  - [Policy Evaluation Rules](#policy-evaluation-rules)
+  - [Working with Policies](#working-with-policies)
+  - [Assigning Policies](#assigning-policies)
+  - [Parameter Constraints](#parameter-constraints)
+  - [Require Response Wrapping TTLs (Time to Live)](#require-response-wrapping-ttls-time-to-live)
+- [Tokens](#tokens)
+  - [Creating Tokens](#creating-tokens)
+  - [Token Properties](#token-properties)
+  - [Token Accessor](#token-accessor)
+  - [Working with Tokens](#working-with-tokens)
+  - [Token Types](#token-types)
+  - [Token Lifetime](#token-lifetime)
+    - [Working with Token Lifetime](#working-with-token-lifetime)
+    - [Setting Maximum Token TTL](#setting-maximum-token-ttl)
+- [Secrets Engines](#secrets-engines)
+  - [Types of Secrets](#types-of-secrets)
+  - [Working with Secrets Engines](#working-with-secrets-engines)
+  - [Response Wrapping](#response-wrapping)
+  - [Secrets Engine: Cubbyhole](#secrets-engine-cubbyhole)
+  - [Secrets Engine: Identity](#secrets-engine-identity)
+  - [Secret Engine: Database](#secret-engine-database)
+  - [Secret Engine: Key Value (KV)](#secret-engine-key-value-kv)
+  - [Secret Engine: Transit](#secret-engine-transit)
+- [Leases](#leases)
+  - [Working with Leases](#working-with-leases)
+- [System Backend](#system-backend)
+
+<!-- /code_chunk_output -->
 
 ---
 
-## Insert other Notes Here
-
-TODO
 
 ## Installing Vault
 
