@@ -876,16 +876,49 @@ There are two version of thi engine
 - Relieves burden of proper encryption/decryption
 - Encryption keys that it uses to perform all actions are maintained the Transit secrets engine
 
+## Leases
 
+- Control dynamic secret lifecycle
+- Dynamic secrets and service tokens are created with a lease
+  - "Leases" for dynamic secrets
+  - "TTL" for service tokens
+- Can renew or revoke a lease
+- Leases have no direct CLI command
+  - Use `/sys/leases/lookup` path
+- Lease Properties
+  - `lease-id` - Unique identifier for the dynamic secret
+  - `lease_duration` - How much longer is this lease valid for
+  - `lease_renewable` - Is this lease renewable (true or false)
+- `lease_duration` is essentially the TTL
+  - Has default TTL
+  - Maximum TTL
+  - TTL inheritance
+    - System-wide vault server config
+    - Mount-specific config (changed with `tune`)
+    - Object-specific config for each dynamic secret
+- `lease_renewable` is whether or not the lease can be renewed
+  - Set at object level
 
+### Working with Leases
 
-
-
-
-
-
-
-
+- Renewing a lease
+  - `vault lease renew [OPTIONS] LEASE_ID`
+  - **Example:** `vault lease renew -increment=30m consul/creds/web/KWq5lsjdsf89sfjsdfG`
+  - Must be less than the max TTL
+- Revoking a lease
+  - `vault lease revoke [OPTIONS] LEASE_ID`
+  - **Example:** `vault lease revoke consul/creds/web/KWq5lsjdsf89sfjsdfG`
+- Prefix Revocation
+  - Revokes all leases with a given common parent path
+  - Requires elevated `sudo`/root privileges
+  - `vault lease revoke -prefix consul/creds/web/`
+- Lookup active leases
+  - `vault list [OPTIONS] sys/leases/lookup/PATH`
+  - **Example:** `vault list sys/leases/lookup/consul/creds/web/`
+- View leases properties
+  - `vault write [OPTIONS] sys/leases/lookup/ lease_id=LEASE_ID`
+  - **Example:** `vault write sys/leases/lookup/ lease_id=consul/creds/web/KWq5lsjdsf89sfjsdfG`
+  - Note, this is a write/POST operation since we are submitting data in part of the request
 
 ## System Backend
 
