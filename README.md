@@ -10,6 +10,7 @@
 - [Installing Vault](#installing-vault)
 - [Development Mode](#development-mode)
   - [Setting up development mode server](#setting-up-development-mode-server)
+- [Configuring Vault](#configuring-vault)
 - [Interacting with Vault](#interacting-with-vault)
 - [Environment Variables](#environment-variables)
 - [Vault UI](#vault-ui)
@@ -107,6 +108,17 @@
 4. Login in
    - `vault login`
    - Set token: Copy from output from `vault server -dev` output
+
+
+## Configuring Vault
+
+**Docs:** https://www.vaultproject.io/docs/configuration
+
+- Vault configuration is set in a Hashicorp Configuration Langurage (HCL) or JSON file
+- This config file is set using `-config` flag when setting up valut
+  - `vault server -config=my_config.hcl`
+
+
 
 ## Interacting with Vault
 
