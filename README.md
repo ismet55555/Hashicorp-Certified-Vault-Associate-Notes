@@ -63,6 +63,22 @@
 
 ---
 
+## Exam Overview 
+
+**Docs:** https://www.hashicorp.com/certification/vault-associate 
+
+- Beginner or intermediate knowledge level 
+- Do not really need production experience 
+- Working with development is ok 
+- Online proctored
+- 60 questions
+- 60 minutes 
+- Certification lasts 2 years 
+- Type of questions 
+  - Multiple Choice 
+  - Fill in the blank 
+  - Hotspot - click on graphic 
+
 
 ## Installing Vault
 
