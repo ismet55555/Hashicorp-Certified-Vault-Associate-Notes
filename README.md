@@ -14,6 +14,7 @@
     - [Configuration Categories and Parameters](#configuration-categories-and-parameters)
   - [Server Initialization and Unseal](#server-initialization-and-unseal)
   - [Seal/Unseal](#sealunseal)
+    - [Vault Encryption keys](#vault-encryption-keys)
     - [Vault Seal Options](#vault-seal-options)
   - [Key Management](#key-management)
   - [Development Mode](#development-mode)
@@ -143,10 +144,11 @@ Logical:
     sudo apt-get update && sudo apt-get install vault
     ```
 
-
 ### Configuring Vault
 
 **Docs:** https://www.vaultproject.io/docs/configuration
+
+This is performed after vault has been installed
 
 - Vault configuration is set in a Hashicorp Configuration Langurage (HCL) or JSON file
 - This config file is set using `-config` flag when setting up valut
@@ -201,9 +203,8 @@ Logical:
         prometheus_retention_time = "168h"
       }
       ```
-  - Example:
 - **Storage**
-  - Storage backend used by vault server
+  - Storage backend used by vault server to store its data
   - Example: Local disk storage
     - ```hcl
       storage "file" {
@@ -223,7 +224,7 @@ Logical:
     - ```hcl
       storage "raft" {
         path = "/path/to/raft/data"  # <-- Path to locally store raft data
-        node_id = "node_1"      # <-- Unique for each cluster node
+        node_id = "node_1"           # <-- Unique for each cluster node
         retry_join {
           leader_api_addr = "https://node1.vault.local:8200"
           ...
@@ -235,6 +236,8 @@ Logical:
       ```
 
 ### Server Initialization and Unseal
+
+This is performed after vault has been **installed** and the server is **configured**
 
 - **Get Vault Server Status**
   - `vault status`
@@ -281,7 +284,7 @@ Logical:
 
   - **Docs:** https://www.vaultproject.io/docs/commands/operator/unseal
   - `vault operator unseal [OPTIONS] [KEY]`
-  - More than one person running this command severalty from separate terminals
+  - More than one person running this command separately from separate terminals, targeting the same valut server address
   - _Example Output:_ Entering 2 of 3 unseal keys to unseal vault
 
     - ```text
@@ -291,10 +294,10 @@ Logical:
       ---                -----
       Seal Type          shamir
       Initialized        true
-      Sealed             true
+      Sealed             true                  <-- Still sealed
       Total Shares       3
       Threshold          2
-      Unseal Progress    1/2
+      Unseal Progress    1/2                   <-- Note the unseal progress
       Unseal Nonce       3d24a0fa-edd8-7ad4-85fe-d4779f757a03
       Version            1.6.3
       Storage Type       raft
@@ -306,7 +309,7 @@ Logical:
       ---                     -----
       Seal Type               shamir
       Initialized             true
-      Sealed                  false
+      Sealed                  false            <-- Finally unsealed
       Total Shares            3
       Threshold               2
       Version                 1.6.3
@@ -329,47 +332,52 @@ Logical:
 **Docs:** https://www.vaultproject.io/docs/concepts/seal#seal-unseal
 
 - Vault starts in a sealed state, it doesn't know how to decrypt anything
-- Unsealing Vault provides plaintext key to decrypt it all
-- Encryption keys
-  - **Encryption keys (keyring)**
-    - Protects/Encrypts data written to storage backend
-    - Stored on disk to storage backend
-  - **Master key**
-    - Protects/Encrypts the encryption keys
-    - Stored on disk to storage backend
-  - **Unseal key**
-    - Protects/Encrypts the master key
-    - Stored as **key shares** or on external service or device
-    - Can be divided up in multiple keys, entered separately by different users
-    - Never stored by Vault
+- Unsealing Vault provides encryption key to decrypt data
+
+#### Vault Encryption keys
+
+- **Encryption keys (keyring)**
+  - Protects/Encrypts data written to storage backend
+  - Actively used on data
+  - Stored on disk to storage backend
+- **Master key**
+  - Protects/Encrypts the encryption keys (keyring)
+  - Stored on disk to storage backend
+- **Unseal key**
+  - Protects/Encrypts the master key
+  - Stored as **key shares** or on external service or device with multiple individuals
+  - Can be divided up in multiple keys, entered separately by different users
+  - _Never stored by Vault_
 
 > **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring is encrypted by the master key; and the master key is encrypted by the unseal key
 
 #### Vault Seal Options
 
-- Shamir secret sharing
+- Shamir Secret Sharing
   - Key shares - How many shares to split the unseal key into
   - Required threshold to unseal - Minimum number of shares to unseal
   - Configured at initialization (`vault operator init`)
   - Used for sensitive operations
+  - Manual user intervention required to unseal
 - Auto-unseal
   - Provided by some external service (HSM, Azure keyvault, AWS KMS, etc)
-  - Recovery key shares
-  - To enable, set in config file, or environmental variable after initialization
+  - Uses recovery key shares
+  - To enable this seal option, set in config file or environmental variable after initialization
   - Does not require human intervention
 - Seal Migration
   - Can convert either way `Shamir secret sharing <-> Auto-unseal`
   - Can be done through CLI or API
 
-
 ### Key Management
+
+This is performed after Vault has been installed, configured, and initialized.
 
 - **Rekey Unseal and Master Key**
   - Update unseal and master keys
   - Change seal settings
   - Considered a privileged operation
   - Will need unseal key shares
-  - `vault operator reky [OPTIONS] [KEY]`
+  - `vault operator rekey [OPTIONS] [KEY]`
   - Example: Change the number of key shares
     - Start the process: `vault operator rekey -init -key-shares=7 -key-threshold=5`
     - Continue process: `vault operator rekey`
@@ -378,15 +386,19 @@ Logical:
   - Will give current version of encryption key
   - `vault operator key-status [OPTIONS]`
 - **Rotate the encryption key**
+
   - Update encryption keyring
   - Saves previous versions are saved
   - Must be logged in into Vault (need admin/root rights)
   - `vault operator roate [OPTIONS]`
   - Example:
+
     - Login: `vault login`
     - Check status of encryption keys: `vault operator key-status`
     - Rotate encryption key: `vault operator rotate`
+
       - Example Output:
+
         - ```text
           Success! Rotated key
 
@@ -395,10 +407,9 @@ Logical:
           Encryption Count    0
           ```
 
-
-
 ### Development Mode
 
+- **Never use this in production! This is used for dev/demo/training purposed only**
 - Running on Localhost
 - No SSL - Using HTTP, not HTTPS
 - In-memory storage
@@ -423,12 +434,9 @@ Logical:
 ## Interacting with Vault
 
 1. CLI
-
    - General command structure: `vault <command> <subcommand> [options] [ARGUMETNS]`
    - Help menu: `vault <command> --help`
-
    - Getting help with given path: `vault path-help PATH`
-
 2. Browser UI
 3. API
 
