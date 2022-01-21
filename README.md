@@ -1,16 +1,23 @@
 <h1 align="center">Hashicorp Certified Vault Associate Notes</h1>
-
 <h3 align="center">hashicorp.com/certification/vault-associate</h3>
-
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
-- [Installing Vault](#installing-vault)
-- [Development Mode](#development-mode)
-  - [Setting up development mode server](#setting-up-development-mode-server)
-- [Configuring Vault](#configuring-vault)
+- [Exam Overview](#exam-overview)
+  - [General Objectives](#general-objectives)
+- [Vault Architecture](#vault-architecture)
+- [Vault Setup](#vault-setup)
+  - [Installing Vault](#installing-vault)
+  - [Configuring Vault](#configuring-vault)
+    - [Configuration Categories and Parameters](#configuration-categories-and-parameters)
+  - [Server Initialization and Unseal](#server-initialization-and-unseal)
+  - [Seal/Unseal](#sealunseal)
+    - [Vault Seal Options](#vault-seal-options)
+  - [Key Management](#key-management)
+  - [Development Mode](#development-mode)
+    - [Step to Set Up Development Mode Server](#step-to-set-up-development-mode-server)
 - [Interacting with Vault](#interacting-with-vault)
 - [Environment Variables](#environment-variables)
 - [Vault UI](#vault-ui)
@@ -61,26 +68,60 @@
 
 <!-- /code_chunk_output -->
 
----
+## Exam Overview
 
-## Exam Overview 
+**Docs:** https://www.hashicorp.com/certification/vault-associate
 
-**Docs:** https://www.hashicorp.com/certification/vault-associate 
-
-- Beginner or intermediate knowledge level 
-- Do not really need production experience 
-- Working with development is ok 
+- Beginner or intermediate knowledge level
+- Do not really need production experience
+- Working with development is ok
 - Online proctored
 - 60 questions
-- 60 minutes 
-- Certification lasts 2 years 
-- Type of questions 
-  - Multiple Choice 
-  - Fill in the blank 
-  - Hotspot - click on graphic 
+- 60 minutes
+- Certification lasts 2 years
+- Type of questions
+  - Multiple Choice
+  - Fill in the blank
+  - Hotspot - click on graphic
 
+### General Objectives
 
-## Installing Vault
+1. Compare authentication methods
+2. Create Vault policies
+3. Assess Vault tokens
+4. Manage Vault leases
+5. Compare and configure Vault secrets engines
+6. Utilize Vault CLI
+7. Utilize Vault UI
+8. Be aware of the Vault API
+9. Explain Vault architecture
+10. Explain encryption as a service
+
+## Vault Architecture
+
+Conceptual:
+
+- Clients -> API -> Vault -> Backend
+- Backend
+  - Authentication
+  - Policies
+  - Secrets Engines
+  - Audit Logging
+- Frontend
+  - Clients (CLI, SDK, etc) -> API -> Vault
+  - Clients use Vault tokens to do things
+
+Logical:
+
+- Vault creates a barrier
+- Anything entering the barrier is encrypted
+- On frontend API communication with Vault is with TLS Certificate
+- On backend Vault stores to backend storage, this is also encrypted through encryption keys
+- API -> Barrier -> Vault -> Barrier -> Storage
+
+## Vault Setup
+
+### Installing Vault
 
 **Docs:** https://learn.hashicorp.com/tutorials/vault/getting-started-install
 
@@ -102,7 +143,261 @@
     sudo apt-get update && sudo apt-get install vault
     ```
 
-## Development Mode
+
+### Configuring Vault
+
+**Docs:** https://www.vaultproject.io/docs/configuration
+
+- Vault configuration is set in a Hashicorp Configuration Langurage (HCL) or JSON file
+- This config file is set using `-config` flag when setting up valut
+  - `vault server -config=my_config.hcl`
+
+#### Configuration Categories and Parameters
+
+- **General**
+  - Any info not in any configuration block
+  - `ui = true`
+    - Enable/Disable Vault Web UI
+  - `disable_mlock = false`
+    - Enable/Disable: Prevent data in memory to be written to swap storage
+    - Set to `true` if using integrated storage (raft)
+  - `cluster_addr = "https://vault.example.com:8200"`
+    - Address of the Vault cluster
+  - `api_addr = "https://vault.example.com:8200"`
+    - Address of the Vault API given to clients
+- **High Availability / Replication**
+  - Options for cluster scenario
+- **Listener**
+  - How vault server will listen for incoming requests from clients and other cluster members
+  - Example: Loopback address
+    - ```hcl
+      listener "tcp" {
+        address = "127.0.0.1:8200"          # <-- Listen for requests on this address
+        cluster_address = "127.0.0.1:8201"  # <-- Listen for cluster communication
+        tls_cert_file = "public/cert.crt"   # <-- TLS certificate for secure communication
+        tls_key_file = "private/cert.key"   # <-- TLS private key for secure communication
+      }
+      ```
+- **Seal (Optional)**
+  - How vault seal is configured
+  - Only used for auto-unseal
+  - Example: Unseal using AWS KMS
+    - ```hcl
+      seal "awskms" {
+        region     = "us-east-1"
+        access_key = "AKIAIOSFODNN7EXAMPLE"
+        secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        kms_key_id = "19ec80b0-dfdd-4d97-8164-c6examplekey"
+        endpoint   = "https://vpce-0e1bb1852241f8cc6-pzi0do8n.kms.us-east-1.vpce.amazonaws.com"
+      }
+      ```
+- **Telemetry**
+  - What performance and health info to send from valut server to monitoring system
+  - Can have one or more nested blocks within it for different telemetry data or target
+  - Example: Prometheus
+    - ```hcl
+      telemetry {
+        disable_hostname = true
+        prometheus_retention_time = "168h"
+      }
+      ```
+  - Example:
+- **Storage**
+  - Storage backend used by vault server
+  - Example: Local disk storage
+    - ```hcl
+      storage "file" {
+        path = "/mnt/vault/data"
+      }
+      ```
+  - Example: AWS S3 storage
+    - ```hcl
+      storage "s3" {
+        region = "us-east-1"
+        bucket = "vault-server-data"
+        access_key = "AKIAIOSFODNN7EXAMPLE"
+        secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      }
+      ```
+  - Example: Integrated Storage (Raft) - Cluster setup
+    - ```hcl
+      storage "raft" {
+        path = "/path/to/raft/data"  # <-- Path to locally store raft data
+        node_id = "node_1"      # <-- Unique for each cluster node
+        retry_join {
+          leader_api_addr = "https://node1.vault.local:8200"
+          ...
+        }
+        retry_join {     # <-- A block for each member of the cluster
+          ...
+        }
+      }
+      ```
+
+### Server Initialization and Unseal
+
+- **Get Vault Server Status**
+  - `vault status`
+  - Will show if vault is sealed or not
+  - Will show if vault is initialized of not
+  - _Example Output:_ Sealed and not initialized vault server
+    - ```text
+      Key                Value
+      ---                -----
+      Seal Type          shamir
+      Initialized        false
+      Sealed             true
+      Total Shares       0
+      Threshold          0
+      Unseal Progress    0/0
+      Unseal Nonce       n/a
+      Version            1.6.3
+      Storage Type       raft
+      HA Enabled         true
+      ```
+- **Initialize Vault Server**
+
+  - **Docs:** https://www.vaultproject.io/docs/commands/operator
+  - `vault operator init [OPTIONS]`
+  - _Example:_ Use Shamir secret sharing with specified key shares
+
+    - `vault operator init -key-shares=3 -key-threshold=2`
+    - _Example Output:_
+
+      - ```text
+        Unseal Key 1: zCku4j3Q2WoiEMze0mvpbf98VOAVOfTxcNbvweJiR0NL
+        Unseal Key 2: J8iBqZ8SSQsUvYFA/EOra4h22cGrmuZicKXfA3Nj32xd
+        Unseal Key 3: SjYlN0OfH8DANm7b9zkTGlHllJ323KqBcCJ6jr/5Nf1P
+
+        Initial Root Token: s.9BampfHGQIc5nhVPGlp63hXT
+
+        Vault initialized with 3 key shares and a key threshold of 2. Please ...
+        ```
+
+  - _Example:_ Using auto-unseal
+    - `vault operator init -recovery-share=5 -recovery-threshold=3`
+
+- **Unseal Vault Server**
+
+  - **Docs:** https://www.vaultproject.io/docs/commands/operator/unseal
+  - `vault operator unseal [OPTIONS] [KEY]`
+  - More than one person running this command severalty from separate terminals
+  - _Example Output:_ Entering 2 of 3 unseal keys to unseal vault
+
+    - ```text
+      ismet:~$ vault operator unseal
+      Unseal Key (will be hidden): <HIDDEN INPUT VIA TERMINAL>
+      Key                Value
+      ---                -----
+      Seal Type          shamir
+      Initialized        true
+      Sealed             true
+      Total Shares       3
+      Threshold          2
+      Unseal Progress    1/2
+      Unseal Nonce       3d24a0fa-edd8-7ad4-85fe-d4779f757a03
+      Version            1.6.3
+      Storage Type       raft
+      HA Enabled         true
+
+      ismet:~$ vault operator unseal
+      Unseal Key (will be hidden):  <HIDDEN INPUT VIA TERMINAL>
+      Key                     Value
+      ---                     -----
+      Seal Type               shamir
+      Initialized             true
+      Sealed                  false
+      Total Shares            3
+      Threshold               2
+      Version                 1.6.3
+      Storage Type            raft
+      Cluster Name            vault-cluster-39615fe5
+      Cluster ID              59f91aa5-65db-ea8c-b72d-6a30081a3833
+      HA Enabled              true
+      HA Cluster              n/a
+      HA Mode                 standby
+      Active Node Address     <none>
+      Raft Committed Index    24
+      Raft Applied Index      24
+      ```
+
+- **Seal Vault Server**
+  - `vault operator seal [OPTIONS]`
+
+### Seal/Unseal
+
+**Docs:** https://www.vaultproject.io/docs/concepts/seal#seal-unseal
+
+- Vault starts in a sealed state, it doesn't know how to decrypt anything
+- Unsealing Vault provides plaintext key to decrypt it all
+- Encryption keys
+  - **Encryption keys (keyring)**
+    - Protects/Encrypts data written to storage backend
+    - Stored on disk to storage backend
+  - **Master key**
+    - Protects/Encrypts the encryption keys
+    - Stored on disk to storage backend
+  - **Unseal key**
+    - Protects/Encrypts the master key
+    - Stored as **key shares** or on external service or device
+    - Can be divided up in multiple keys, entered separately by different users
+    - Never stored by Vault
+
+> **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring is encrypted by the master key; and the master key is encrypted by the unseal key
+
+#### Vault Seal Options
+
+- Shamir secret sharing
+  - Key shares - How many shares to split the unseal key into
+  - Required threshold to unseal - Minimum number of shares to unseal
+  - Configured at initialization (`vault operator init`)
+  - Used for sensitive operations
+- Auto-unseal
+  - Provided by some external service (HSM, Azure keyvault, AWS KMS, etc)
+  - Recovery key shares
+  - To enable, set in config file, or environmental variable after initialization
+  - Does not require human intervention
+- Seal Migration
+  - Can convert either way `Shamir secret sharing <-> Auto-unseal`
+  - Can be done through CLI or API
+
+
+### Key Management
+
+- **Rekey Unseal and Master Key**
+  - Update unseal and master keys
+  - Change seal settings
+  - Considered a privileged operation
+  - Will need unseal key shares
+  - `vault operator reky [OPTIONS] [KEY]`
+  - Example: Change the number of key shares
+    - Start the process: `vault operator rekey -init -key-shares=7 -key-threshold=5`
+    - Continue process: `vault operator rekey`
+    - Vault will respond with 5 unseal keys
+- **Check the encryption key status**
+  - Will give current version of encryption key
+  - `vault operator key-status [OPTIONS]`
+- **Rotate the encryption key**
+  - Update encryption keyring
+  - Saves previous versions are saved
+  - Must be logged in into Vault (need admin/root rights)
+  - `vault operator roate [OPTIONS]`
+  - Example:
+    - Login: `vault login`
+    - Check status of encryption keys: `vault operator key-status`
+    - Rotate encryption key: `vault operator rotate`
+      - Example Output:
+        - ```text
+          Success! Rotated key
+
+          Key Term            2
+          Install Time        21 Jan 22 04:13 UTC
+          Encryption Count    0
+          ```
+
+
+
+### Development Mode
 
 - Running on Localhost
 - No SSL - Using HTTP, not HTTPS
@@ -113,7 +408,7 @@
 - UI enabled
 - Key/Value secrets engine enabled
 
-### Setting up development mode server
+#### Step to Set Up Development Mode Server
 
 1. Start the development vault server
    - `vault server -dev`
@@ -124,17 +419,6 @@
 4. Login in
    - `vault login`
    - Set token: Copy from output from `vault server -dev` output
-
-
-## Configuring Vault
-
-**Docs:** https://www.vaultproject.io/docs/configuration
-
-- Vault configuration is set in a Hashicorp Configuration Langurage (HCL) or JSON file
-- This config file is set using `-config` flag when setting up valut
-  - `vault server -config=my_config.hcl`
-
-
 
 ## Interacting with Vault
 
