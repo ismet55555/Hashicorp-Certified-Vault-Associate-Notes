@@ -1,5 +1,5 @@
 <h1 align="center">Hashicorp Certified Vault Associate Notes</h1>
-<h3 align="center">hashicorp.com/certification/vault-associate</h3>
+<h4 align="center"><a href="https://www.hashicorp.com/certification/vault-associate">hashicorp.com/certification/vault-associate</a></h3>
 
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
