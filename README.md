@@ -126,18 +126,20 @@ Logical:
 
 **Docs:** https://learn.hashicorp.com/tutorials/vault/getting-started-install
 
-- Windows
+- **Windows**
 
-  - `choco install vault`
+  - ```psh
+    choco install vault
+    ```
 
-- MacOS:
+- **MacOS:**
 
   - ```bash
     brew tap hashicorp/tap
     brew install hashicorp/tap/vault
     ```
 
-- Ubuntu/Debian:
+- **Ubuntu/Debian:**
   - ```bash
     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
@@ -171,7 +173,7 @@ This is performed after vault has been installed
   - Options for cluster scenario
 - **Listener**
   - How vault server will listen for incoming requests from clients and other cluster members
-  - Example: Loopback address
+  - Example: Local loopback address
     - ```hcl
       listener "tcp" {
         address = "127.0.0.1:8200"          # <-- Listen for requests on this address
@@ -182,15 +184,15 @@ This is performed after vault has been installed
       ```
 - **Seal (Optional)**
   - How vault seal is configured
-  - Only used for auto-unseal
-  - Example: Unseal using AWS KMS
+  - Only used for *auto-unseal* functionality
+  - Example: Unseal using AWS KMS service
     - ```hcl
       seal "awskms" {
         region     = "us-east-1"
-        access_key = "AKIAIOSFODNN7EXAMPLE"
-        secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         kms_key_id = "19ec80b0-dfdd-4d97-8164-c6examplekey"
         endpoint   = "https://vpce-0e1bb1852241f8cc6-pzi0do8n.kms.us-east-1.vpce.amazonaws.com"
+        access_key = "AKIAIOSFODNN7EXAMPLE"
+        secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
       }
       ```
 - **Telemetry**
@@ -227,32 +229,31 @@ This is performed after vault has been installed
         node_id = "node_1"           # <-- Unique for each cluster node
         retry_join {
           leader_api_addr = "https://node1.vault.local:8200"
-          ...
+          ... <MORE> ...
         }
         retry_join {     # <-- A block for each member of the cluster
-          ...
+          ... <MORE> ...
         }
       }
       ```
 
 ### Server Initialization and Unseal
 
-This is performed after vault has been **installed** and the server is **configured**
+This is performed after vault has been *installed* and the server is *configured*
 
 - **Get Vault Server Status**
   - `vault status`
-  - Will show if vault is sealed or not
-  - Will show if vault is initialized of not
-  - _Example Output:_ Sealed and not initialized vault server
+  - Will show if vault is sealed and/or initialized
+  - _Example Output:_ Status of a sealed and not initialized vault server
     - ```text
       Key                Value
       ---                -----
       Seal Type          shamir
-      Initialized        false
-      Sealed             true
+      Initialized        false       <-- Vault is not initialized
+      Sealed             true        <-- Vault is sealed
       Total Shares       0
       Threshold          0
-      Unseal Progress    0/0
+      Unseal Progress    0/0         <-- No key shares applied
       Unseal Nonce       n/a
       Version            1.6.3
       Storage Type       raft
@@ -293,12 +294,12 @@ This is performed after vault has been **installed** and the server is **configu
       Key                Value
       ---                -----
       Seal Type          shamir
-      Initialized        true
+      Initialized        true                  <-- Vault is initialized
       Sealed             true                  <-- Still sealed
       Total Shares       3
       Threshold          2
       Unseal Progress    1/2                   <-- Note the unseal progress
-      Unseal Nonce       3d24a0fa-edd8-7ad4-85fe-d4779f757a03
+      Unseal Nonce       3d24a0fa-edd ...
       Version            1.6.3
       Storage Type       raft
       HA Enabled         true
@@ -315,7 +316,7 @@ This is performed after vault has been **installed** and the server is **configu
       Version                 1.6.3
       Storage Type            raft
       Cluster Name            vault-cluster-39615fe5
-      Cluster ID              59f91aa5-65db-ea8c-b72d-6a30081a3833
+      Cluster ID              59f91aa5-65d ...
       HA Enabled              true
       HA Cluster              n/a
       HA Mode                 standby
@@ -349,7 +350,9 @@ This is performed after vault has been **installed** and the server is **configu
   - Can be divided up in multiple keys, entered separately by different users
   - _Never stored by Vault_
 
-> **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring is encrypted by the master key; and the master key is encrypted by the unseal key
+> **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring 
+> is encrypted by the master key; and the master key is encrypted by the unseal key. The unseal
+> keys is kept in an external and secure location.
 
 #### Vault Seal Options
 
@@ -375,8 +378,7 @@ This is performed after Vault has been installed, configured, and initialized.
 - **Rekey Unseal and Master Key**
   - Update unseal and master keys
   - Change seal settings
-  - Considered a privileged operation
-  - Will need unseal key shares
+  - Considered a privileged operation - Will need unseal key shares
   - `vault operator rekey [OPTIONS] [KEY]`
   - Example: Change the number of key shares
     - Start the process: `vault operator rekey -init -key-shares=7 -key-threshold=5`
@@ -387,7 +389,7 @@ This is performed after Vault has been installed, configured, and initialized.
   - `vault operator key-status [OPTIONS]`
 - **Rotate the encryption key**
 
-  - Update encryption keyring
+  - Update encryption keyring (not master or unseal key)
   - Saves previous versions are saved
   - Must be logged in into Vault (need admin/root rights)
   - `vault operator roate [OPTIONS]`
@@ -431,6 +433,22 @@ This is performed after Vault has been installed, configured, and initialized.
    - `vault login`
    - Set token: Copy from output from `vault server -dev` output
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Interacting with Vault
 
 1. CLI
@@ -462,26 +480,47 @@ This is performed after Vault has been installed, configured, and initialized.
 ## Vault UI
 
 - Uses API on backend (as everything else that interacts with vault)
-- Not enabled by default
-- Runs on the same port as API
-- Basic console within the UI for basic vault commands
+- Not enabled by default, must turn on in configuration file
+- Runs on the same port as API (Port 8200)
+- Includes a basic console within the UI for basic vault commands
 - Getting to the UI
   1. Navigate to `<VAULT HOST>:<PORT>/ui`
      - **Example:** http://127.0.0.1:8200/ui
-  2. Enter your token
+  2. Enter your token for access
 
 ## Vault API
 
 - RESTful API - Request/Response
-- Used by UI and CLI
+- Used by any interaction with vault, including UI and CLI
 - Any request tools (ie. curl)
 - Need to specify your token for each request
-- **Example:**
-  - `curl --header "X-Vault-Token: $root_token" --request GET $VAULT_ADDR/v1/sys/host-info`
+- **Example:** GET request: Get host information
+  - ```bash
+    curl \
+      --header "X-Vault-Token: JSDL2073lkhLLHDF983FD" \
+      --request GET \
+      http://127.0.0.1:8200/v1/sys/host-info
+    ```
+- **Example:** POST request: Tune a secret
+  - ```bash
+    cat payload.json
+    {
+      "options": {
+          "version": "2"
+      }
+    }
+
+    curl \
+        --header "X-Vault-Token: JSDL2073lkhLLHDF983FD" \
+        --request POST \
+        --data @payload.json \
+        http://127.0.0.1:8200/v1/sys/mounts/secret/tune
+    ```
+
 
 ## Authentication Methods
 
-- _The point is to generate a `Token`, then use this Token to log into vault._
+- _The point is to generate a `Token`, then use that Token to log into vault._
 - Provided by plug-ins with binary
 - Can enable multiple auth methods
   - Can also enable multiple instances for multiple auth methods
@@ -530,39 +569,43 @@ This is performed after Vault has been installed, configured, and initialized.
 
 - Used for machines and apps
 - Consists of RoleID (Username) and SecretID (password)
-- Vault server push secret ID to the client, or have client hold secretID when it boots up
-- Enable AppRole:
-  - `vault auth enable approle`
-- Tune AppRole:
-  - `vault auth tune -description "My AppRole" approle/`
-- Create a named role:
+- Client already has the SecretID
+  - Vault server pushes SecretID to the client
+  - Client hold SecretID when it boots up (maybe through configuration management or image)
+- **AppRole Set up**
+  - Executed anywhere before using AppRole
+  - Enable AppRole:
+    - `vault auth enable approle`
+  - Tune AppRole:
+    - `vault auth tune -description "My AppRole" approle/`
+  - Create a named role:
+    - ```
+      vault write auth/approle/<ROLE_NAME> \
+          role_name=<ROLE_NAME> \
+          secret_id_ttl=<SECRET_ID_TTL> \
+          token_num_uses=<TOKEN_NUM_USES> \
+          token_ttl=<TOKEN_TTL> \
+          token_max_ttl=<TOKEN_MAX_TTL>
+      ```
 
-  - ```
-    vault write auth/approle/<ROLE_NAME> \
-    		role_name=<ROLE_NAME> \
-    		secret_id_ttl=<SECRET_ID_TTL> \
-    		token_num_uses=<TOKEN_NUM_USES> \
-    		token_ttl=<TOKEN_TTL> \
-    		token_max_ttl=<TOKEN_MAX_TTL>
-    ```
+- **Getting the SecretId**
+  - Can be done within the client or before deployment, adding it to the client image
+  - Need `role_id`
+    - `vault read auth/approle/role/<ROLE_NAME>/role-id`
+  - Need `secret_id`
+    - `vault write -force auth/approle/role/<ROLE_NAME>/secret-id`
+    - Note the `write`, this generates data
+    - Generated on the fly, or can specify the `secret_id`
+    - This yields `secret_id`, `secret_id_accessor`, and `secret_id_ttl`
 
-- Logging in with AppRole
-  - Information:
-    - `vault path-help auth/approle/login`
-  - Generating Vault Client Token
-    - Need `role_id`
-      - `vault read auth/approle/role/<ROLE_NAME>/role-id`
-    - Need `secret_id`
-      - `vault write -force auth/approle/role/<ROLE_NAME>/secret-id`
-      - Note the `write`, this generates data
-      - Generated on the fly, or can specify the `secret_id`
-      - This yields `secret_id`, `secret_id_accessor`, and `secret_id_ttl`
-    - Using CLI:
-      - `vault write auth/approle/login role_id=<ROLE_ID> secret_id=<SECRET_ID>`
-      - This yields a token and its information
-    - Using REST API
-      - POST to `<VAULT_ADDR>/v1/auth/approle/login`
-      - Passed data includes `role_id` and `secret_id`
+- **Getting the Client Vault Token**
+  - Executed by the client machine to further interact with vault for further vault usage
+  - This yields a token and its information
+  - Passed data includes `role_id` and `secret_id`
+  - Using CLI:
+    - `vault write auth/approle/login role_id=<ROLE_ID> secret_id=<SECRET_ID>`
+  - Using REST API
+    - POST to `<VAULT_ADDR>/v1/auth/approle/login`
 
 ### Auth Method: AWS
 
@@ -572,50 +615,58 @@ TODO
 
 ### Configuration
 
-- All methods are enabled on `/sys/auth`
-- All methods are enabled on a path
-  - If not specified, default to method name
+- All methods are enabled on vault path `/sys/auth`
+- When enabled, all methods are enabled on a path
+  - If not specified, the path defaults to the actual method name
 - Methods cannot be moved after they are set on a path
 - Once enabled, can be tuned and configured
-  - **Tunning:** Common for all methods
-  - **Configuration:** Specific to each method (in `/sys/auth/<method>/config`)
+  - **Tunning:** Common operation for all methods (ie. change description)
+  - **Configuration:** Specific to each auth method (in `/sys/auth/<method>/config`)
 
 ### Basic Commands
 
-- List Existing:
+- List existing auth methods
   - `vault auth list`
-- List Available Options:
+- List available options
   - `vault path-help auth/<AUTH METHOD NAME>`
-- Enable:
+- Enable an auth method
   - `vault auth enable [options] TYPE`
-  - Enable with custom path: `vault auth enable -path=globopass userpass`
-  - Enable userpass: `vault auth enable userpass`
-  - Enable approle: `vault auth enable approle`
-- Tune:
+  - Enable userpass
+    - `vault auth enable userpass`
+    - `vault auth enable -path=globopass userpass` (With custom auth path)
+  - Enable approle  
+    - `vault auth enable approle`
+- Tune auth method:
   - `vault auth tune [options] PATH`
-  - **Example:** `vault auth tune -description="First userpass" globopass/`
+  - **Example:** Changing the description of an auth method
+    - `vault auth tune -description="First userpass" globopass/`
 - Disable:
-  - Warning: This will remove all info stored by this auth method
+  - **Warning:** This will remove all info stored by this auth method
   - `vault auth disable [options] PATH`
 
 ### Authenticating (Logging in)
 
-- Using `vault login`
+Can be done using `vault login` or `vault write`
+
+- **Using `vault login`**
   - **Docs:** https://www.vaultproject.io/docs/commands/login
   - For interactive methods view user
   - Will result in token and token information
   - `vault login`
     - Will prompt for token in terminal
   - `vault login [TOKEN]`
-  - Will use provided token
-  - **Example:**
-    - `vault login s.2f3c5L1MHtnqbuNCbx90utmC`
+    - Will use provided token
+    - **Example:**
+      - `vault login s.2f3c5L1MHtnqbuNCbx90utmC`
   - `vault login [options] [AUTH METHOD KEY-VALUE PAIRS]`
     - Depends on the auth method used
-    - Examples:
-    - `vault login userpass username=<USERNAME> password=<PASSWORD>`
-    - `vault login -method=github -path=github-prod`
-- Using `vault write`, targeting a particular auth method path
+    - **Examples:**
+      - `vault login userpass username=<USERNAME> password=<PASSWORD>`
+      - `vault login -method=github -path=github-prod`
+  - Output token only: `-token-only`
+  - No output: `-no-print`
+- **Using `vault write`**
+  - For a particular auth method path
   - For any other method (AppRole, LDAP, etc)
   - `vault write [options] PATH [KEY-VALUE PAIRS]`
   - Depends on the auth method used
@@ -636,10 +687,10 @@ TODO
 - Grant or forbid access to certain paths and operations (what you can do in Vault)
 - Policies are `deny` by default (Empty policy)
 - Policies are assigned to tokens, identity, or auth method
-
-- Define permissions (Access Control Lists (ACL))
+- Defines permissions (ie. Access Control Lists (ACL))
 - No internal versioning of policies
-  - Make you back up some other way
+  - As of now, you have to version and/or back up policy iterations some other way
+  - Potentially use `git`
 
 ### `root` Policy
 
@@ -651,47 +702,59 @@ TODO
 The default policy on a token allows the following:
 
 - Look up their own properties
-  - `path "auth/token/lookup-self" { ... }`
+  - ```hcl
+    path "auth/token/lookup-self" { ... }
+    ```
 - Renew themselves
-  - `path "auth/token/renew-self" { ... }`
+  - ```hcl
+    path "auth/token/renew-self" { ... }
+    ```
 - Revoke themselves
-  - `path "auth/token/revoke-self" { ... }`
+  - ```hcl
+    path "auth/token/revoke-self" { ... }
+    ```
 - Look up its own capabilities on a path
-  - `path "sys/capabilities-self" { ... }`
-- Look up its own entity by id or name
-  - `path "identity/entity/id/{{identity.entity.id}}" { ... }`
+  - ```hcl
+    path "sys/capabilities-self" { ... }
+    ```
+- Look up its own entity by id or name (using policy template)
+  - ```hcl
+    path "identity/entity/id/{{identity.entity.id}}" { ... }
+    ```
 
 ### Policy Syntax
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#policy-syntax
 
-- HashiCorp Configuration Language (HCL) _(preferred)_ or JSON
-- _Policy Path_ - Where the policy is applied
+- Policies are defined as HashiCorp Configuration Language (HCL) _(preferred)_ or JSON
+- _Policy Path_ - Where and to what the policy is applied
 - _Policy Capabilities_ - What actions are allowed
-- Basic path expression: `path "some-path/in/valut"`
+- Basic path expression: `path "some-path/in/vault"`
 - Two wildcards are available for path expressions:
-  1.  Glob: `*`
-      - Always added at the END of a path expression
-  - This should match the extension of path (Note: This is not RegEx)
-    - **Example:**
-    - `path "some-path/*"` can evaluate as `path "some-path/something"` and `path "some-path/something/else"`
-  2.  Segment: `+`
-      - Always added WITHIN a path
-  - This should match any number of characters for a path segment
-    - **Example:**
-    - `path "secrets/+/blah"` can evaluate as `path "secrets/something/blah"` and `path "secrets/cool/blah"`
-  - Unless wildcards are specified, the expression is only for the specific path -`"secret/foo"` would only address `secret/foo`, and nothing under it
+  1.  **Glob: `*`**
+      - Always added at the *END* of a path expression
+      - This should match the extension of path (Note: This is not RegEx)
+      - **Example:** `path "some-path/*"`
+        - Evaluated as `path "some-path/something"` and `path "some-path/something/else"`
+  2.  **Segment: `+`**
+      - Always added *WITHIN* a path
+      - This should match any number of characters for a path segment
+      - **Example:** `path "secrets/+/blah"` 
+        - Evaluated as `path "secrets/something/blah"` and `path "secrets/else/blah"`
+- Note: Unless wildcards are specified, the expression is only for the specific path -`"secret/foo"` would only address `secret/foo`, and nothing under it
+- `list` capability allows viewing in UI
+
 
 #### Examples
 
-- **Example** Grant read access to only secret `secret/foo`
+- **Example** Grant `read` access to only secret `secret/foo`
   - ```hcl
     path "secret/foo" {
     	capabilities = ["read", "list"]
     }
     ```
 - Wildcard `*` addresses all downstream paths
-  - **Example** Grant read and list access to all secrets
+  - **Example** Grant `read` and `list` access to all secrets
   - ```hcl
     path "secret/*" {
     	capabilities = ["read", "list"]
@@ -709,12 +772,12 @@ The default policy on a token allows the following:
     path "secret/restricted" {
     	capabilities = ["create"]
     	allowed_parameters = {
-    		"foo" = []				# <-- Allow any value
+    		"foo" = []				# <-- Allow any value for foo
     		"bar" = ["zip", "zap"]
     	}
     }
     ```
-- Can use "glob" patterns / wildcard to match paths
+- Can use "glob" (`*`) patterns / wildcard to match downstream paths
   - **Example** `secret/foo/*` can match `secret/foo/bar` or even `secret/foo/bar/baz`
   - ```hcl
     path "secret/foo/*" {
@@ -735,28 +798,39 @@ The default policy on a token allows the following:
 
 - Dynamic way of defining paths in policies
 - These are used within the policy files
-- Using `{{ }}` to let vault know that you are adding a parameter, then adding the path to the parameter
-  - **Example:** Insert the name of the entity
-    - `path "secret/{{identity.entity.name}}/*" { ... }`
-- **IMPORTANT:** Currently, the only source for parameters is `identity` secrets engine
+- Using `{{ }}` to let vault interpreter know that you are adding a parameter, then adding the path to the parameter
+  - **Example:** Insert the name of the entity to define a policy
+    - ```hcl
+      path "secret/{{identity.entity.name}}/*" { ... }
+      ```
+  - **Example:** Use the id of the entity to define a policy
+    - ```hcl
+      path "secret/{{identity.entity.id}}/*" { ... }
+      ```
+- **IMPORTANT:** Currently, the only source for parameters is the `identity` secrets engine
 
 ### Policy Capabilities
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#capabilities
 
-- Follows CRUD semantics (Create, Read, Update, Delete)
+- Follows CRUD semantics (**C**reate, **R**ead, **U**pdate, **D**elete)
   - `create` - Creating data at the given path (similar to `update`) (REST `POST/PUT` request)
   - `read` - Reading data at the given path (REST `GET` request)
   - `update` - Changing data at given path (REST `POST/PUT` request)
   - `delete` - Deleting data at given path (REST `DELETE` request)
+
 - Additional capabilities:
-  - `list` - Listing data at given path. No access to key data (REST `LIST` request)
-  - `sudo` - Access to paths that are _root-protected_
+  - `list`
+    - Listing data at given path
+    - No access to key data (REST `LIST` request)
+    - Allows viewing in the Vault web UI
+  - `sudo` - Give token holder cccess to paths that are _root-protected_
   - `deny` - Disallow access to given path or path pattern. Overrides any other allow action
 
 ### Policy Evaluation Rules
 
-- Policy that Vault applies are determined by the most-specific match available
+- Policies which Vault applies to tokens are determined by the most-specific match available
+  - **Example:** `secret/foo/bar` is more specific than `secret/*`
 - If same policy path pattern appears in multiple policies, the union of both is taken
   - **Example:** Combine `[read, list]` with `[create]` is `[read, list, create]`
 - If different patterns appear in multiple policies, the highest-precedence one is taken
@@ -770,27 +844,26 @@ The default policy on a token allows the following:
     - **Example:** `vault policy read secrets-mgmt`
 - Write a new policy or update an existing policy
   - Using a File: `vault policy write [OPTIONS] [POLICY NAME] [POLICY FILE]`
-  - **Example:** `vault policy write secrets-mgmt policy.hcl`
+    - **Example:** `vault policy write secrets-mgmt policy.hcl`
   - Using Standard In: `vault policy write [OPTIONS] [POLICY NAME] -`
-  - **Example:** `cat policy.hcl | vault policy write secrets-mgmt -`
+    - **Example:** `cat policy.hcl | vault policy write secrets-mgmt -`
 - Delete a policy
   - `vault policy delete [OPTIONS] [POLICY NAME]`
     - **Example:** `vault policy delete secrets-mgmt`
-- Format the policy (more readable syntx)
+- Format the policy (make more readable syntx)
   - `vault policy fmt [OPTIONS] [POLICY FILE]`
     - **Example:** `vault policy fmt policy.hcl`
 
 ### Assigning Policies
 
-The policy has to already be created and active in Vault to be assigned.
+Here the policy has to already be created and active in Vault to be assigned.
 
-1. Associate directly with a token
-   - Assign a policy at token creation
+1. Associate policy directly with a token at token creation
    - **Example:** `vault token create -policy=secrets-mgmt`
-2. Assign to a user in userpass
+2. Assign policy to a user in userpass
    - **Example:** `vault write auth/userpass/users/ismet token_policies="secrets-mgmt"`
-3. Assign to an entity in identity secrets engine
-   - **Example:** `vault write identity/entity/name/ned policies="secrets-mgmt"`
+3. Assign policy to an entity in the identity secrets engine
+   - **Example:** `vault write identity/entity/name/ismet policies="secrets-mgmt"`
 
 ### Parameter Constraints
 
