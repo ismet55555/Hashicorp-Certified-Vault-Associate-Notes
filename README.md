@@ -993,7 +993,7 @@ Tokens can be created in the following ways:
   - Can also view your own token
     - `vault token lookup`
 - Check capabilities/permissions for a specific path
-  - `vault token capabilities TOKEN PATH`
+  - `vault token capabilities [TOKEN] [PATH]`
     - **Example:** `vault token capabilities x.TG08098SLDLFHlsdhflsdhSDFI secret/foo`
 - Renew a token
   - `vault token renew [OPTIONS] [ACCESSOR or ID]`
@@ -1004,8 +1004,7 @@ Tokens can be created in the following ways:
 
 ### Token Types
 
-1. Type Type: **Service**
-
+1. **Service Token**
    - Default type of token for most situations
    - Fully featured
    - Heavyweight
@@ -1015,9 +1014,10 @@ Tokens can be created in the following ways:
    - Calculated lifetime based on token TTL or any renewals for that token
    - Can create child tokens
    - Begins with **"s."** in token ID
+   - **Example:**
+     - `vault token create -policy=my-policy -ttl=60m`
 
-2. Token Type: **Batch**
-
+2. **Batch Token**
    - Not default, must be explicitly created
    - Limited features
    - Lightweight
@@ -1027,7 +1027,7 @@ Tokens can be created in the following ways:
    - Has no child tokens
    - Begins with **"b."** in token ID
    - **Example:**
-     - Create: `vault token create -type=batch -policy=default -ttl=30m`
+     - `vault token create -type=batch -policy=default -ttl=30m`
 
 3. Token Type: **Periodic**
    - Is also a service token
@@ -1043,7 +1043,9 @@ Tokens can be created in the following ways:
 ### Token Lifetime
 
 - TTL (Time to Live) - How long the token is valid for
-- Max TTL - How long can the token be valid before it cannot be renewed anymore
+- Max TTL
+  - How long can the token be valid before it cannot be renewed anymore
+  - Cannot renew the token past this point
 - Token TTL properties
   - `creation_time` - When the token was created
   - `creation_ttl` - The TTL set when the token was created
@@ -1069,7 +1071,7 @@ Tokens can be created in the following ways:
 
 #### Setting Maximum Token TTL
 
-> **Note:** Default max TTL is 32 days
+> **Note:** Default max TTL is 32 days (768 hours)
 
 1. System max TTL
 
@@ -1112,23 +1114,24 @@ Tokens can be created in the following ways:
   - **Identity** - Active Directory, LDAP, etc.
   - **Certificate** - SSH, PKI, etc.
   - **Tokens** - Consul, Nomad
-- All engines are enabled on `/sys/mounts` path`
-- When enabling, if no path is provided, it will default to engine name
+- All engines are enabled on `/sys/mounts` path
+- When enabling, if no path is provided, it will default to the engine name
 - Secrets engines can be moved
-  - Any existing leases will be revoked
-  - May impact policies (which are based on paths)
+  - If moved, any existing leases will be revoked
+  - May impact policies (which are based on specified paths)
 - Engines can be tuned and configured
-  - Tuning settings are common for all engines
-  - Configuration settings are specific to the engine
+  - Tuning settings are same for all secrets engines (ie. description, max lease TTL, etc.)
+  - Configuration settings are specific to the entire secrets engine
 
-> **Note:** Secret engine specifics are not needed for the certification exam, only how to generally use them.
+> **Note:** Secret engine specifics are not needed for the certification exam, only 
+> how to generally use them.
 
 ### Types of Secrets
 
 - **Static secrets**
 
   - Store existing data securely
-  - You already have this data, and Vault needs to manage it and access to it
+  - You already have this data, and Vault needs to manage it, have access to it
   - Manual lifecycle management
   - Manually load new versions of secret to a secret engine
   - **Example:**
@@ -1136,7 +1139,7 @@ Tokens can be created in the following ways:
 
 - **Dynamic Secrets**
   - Generated data on demand
-  - Lease issued for each secret (TTL)
+  - *Lease* issued for each secret (TTL)
   - Automatic lifecycle management
   - Majority of secrets engines are dynamic
 
@@ -1146,8 +1149,9 @@ Tokens can be created in the following ways:
   - `vault secrets list`
 - Enable a new secrets engine
   - `vault secrets enable [OPTIONS] TYPE`
-  - **Example:**
+  - **Example:** Key-value version 2 secrets engine
     - `vault secrets enable -version=2 kv`
+  - **Example:** Database secrets engine
     - `vault secrets enable -path=CompanyData database`
 - Tune a secrets engine settings
   - `vault secrets tune [OPTIONS] PATH`
@@ -1155,6 +1159,7 @@ Tokens can be created in the following ways:
     - `vault secrets tune -max-lease-ttl=72h kv`
     - `vault secrets tune -description="Our cool database engine" CompanyData`
 - Move a secrets engine
+  - Will revoke all included leases
   - `vault secrets move [OPTIONS] SOURCE DESTINATION`
   - **Example:**
     - `vault secrets move CompanyData CompanyDataPrivate`
@@ -1170,39 +1175,74 @@ Tokens can be created in the following ways:
 ### Response Wrapping
 
 **Docs:** https://www.vaultproject.io/docs/concepts/response-wrapping
+**Tutorial:** https://learn.hashicorp.com/tutorials/vault/cubbyhole-response-wrapping
 
 - Provides mechanism for information sharing between many environments
-- Vault takes response it would have sent to a client and insert it into the `cubbyhole` of
+- Vault takes response it would have sent to a client and inserts it into the `cubbyhole` with
   a single-use token, returning that single-use token instead
-- Response it wrapped by the token, retrieving it requires an unwrap operation
+- Response it wrapped by that `cubbyhole` token
+- Retrieving the actual data inside the `cubbyhole` requires an unwrap operation
 - Response wrapping provides:
-
-  - Value transmitted is not the actual secret but a referenc to the secret (response-wrapping token)
-  - Only single party can unwrap the token and see what's inside
+  - Value transmitted is not the actual secret but a reference to the actual secret (response-wrapping token)
+  - Only a single party can unwrap the token and see what's inside
   - Limits the lifetime of secret exposure. If client fails unwrap token, token can expire quickly
-
 - Wrapped token creation
-
-  - Use `wrap-ttl` via CLI
+  - Use `-wrap-ttl=[DURATION]` option flag via CLI
   - Use `X-Vault-Wrap-TTL` header via API
-
 - When a response wrap is requested ...
-
   - **Single-use** token is generated
   - Original response is stored in a single-use token's cubbyhole
   - New response is returned with a single-use token
 
-- The client does not have to authenticate to vault, gets instant access to the secret
-  for one time only
+> **NOTE:** The client does not have to authenticate to vault when trying to unwrap, gets instant 
+> access to the secret for one time only
 
-- Usage
-  - Request wrapping of any command
+**Using CLI**
+  - Wrap a response of any command
     - `vault command -wrap-ttl=[DURATION] PATH`
-      **Example:** `vault kv get -wrap-ttl=1h CustomerData/apikeys/d101`
-    - The resulting token (`wrapping_token`) is passed to entity that needs to retrieve that info
+    - The resulting token (`wrapping_token`) is passed to entity that needs to retrieve that wrapped response
+      **Example:** Create a secret, and wrap the output of the value for the specified key
+        - `vault kv put kv/some_data some_key=some_value`
+        - `vault kv get -wrap-ttl=1h kv/some_data`
+        - Output:
+          - ```text
+            Key                              Value
+            ---                              -----
+            wrapping_token:                  s.WWSuR0GwvjJgscyqS8rffAKL
+            wrapping_accessor:               XwhdoFsKzG2EEoyPQaYTZtj9
+            wrapping_token_ttl:              1h
+            wrapping_token_creation_time:    2022-01-21 22:28:21.2741588 +0000 UTC
+            wrapping_token_creation_path:    kv/data/some_data
+            ```
   - Unwrap using the issued wrap token
     - `vault unwrap [OPTIONS] [TOKEN]`
-    - **Example:** `vault unwrap s.3AGhomXjJt4LeInivNhV1NDJ`
+    - **Example:** Unwrap the previously wrapped response
+      - `vault unwrap -field=data -format=json s.WWSuR0GwvjJgscyqS8rffAKL`
+      - Output:
+        - ```json
+          {
+            "some_key": "some_value"
+          }
+          ```
+**Using API**
+
+Similar to CLI, but using the API in the following format:
+
+- Wrap a response of any command
+  - ```bash
+    curl --header "X-Vault-Wrap-TTL: <TTL>" \      # <-- NOTE
+        --header "X-Vault-Token: <TOKEN>" \
+        --request <HTTP_VERB> \
+        --data '<PARAMETERS>' \
+        <VAULT_ADDRESS>/v1/<ENDPOINT>
+    ```
+- Unwrap using the issued token
+  - ```bash
+    curl --header "X-Vault-Token: <UNWRAP TOKEN>" \
+        --request POST \
+        <VAULT_ADDRESS>/v1/sys/wrapping/unwrap
+    ```
+
 
 ### Secrets Engine: Cubbyhole
 
@@ -1239,7 +1279,7 @@ Tokens can be created in the following ways:
 - Cannot enable multiple instances/paths of the identity engines
 - Each client is a `Entity`
   - Entry within the identity engine that represents a client
-- Any entity can have multiple `Aliases`
+- Any entity can have multiple `Aliases` (ways of authenticating)
   - For example, a single user who has accounts in both GitHub and LDAP,
     can be mapped to a single entity in Vault that has 2 aliases, one
     of type GitHub and one of type LDAP.
@@ -1276,36 +1316,35 @@ There are two version of thi engine
   - Cannot be downgraded to version 1
   - Can be specified at creation
 
-- Usage:
-
+- Usage
   - **Docs:**: https://www.vaultproject.io/docs/secrets/kv/kv-v2#usage
-  - Getting help: `vault kv - help`
+  - Getting help: `vault kv --help`
   - Create/Writing a secret:
     - `vault kv put [OPTIONS] KEY [DATA KEY=VALUE]`
-    - **Example:** `vault kv put CustomerKeys/apikeys/d101 token=1234567890`
+    - **Example:** `vault kv put kv/apikeys/d101 token=1234567890`
   - Read a secret:
     - `vault kv get [OPTIONS] KEY`
-    - **Example:** `vault kv get -version=2 CustomerKeys/apikeys/d101`
+    - **Example:** `vault kv get -version=2 kv/apikeys/d101`
   - Listing secrets:
     - `vault kv list [OPTIONS] PATH`
-    - **Example:** `vault kv list CustomerKeys/apikeys`
+    - **Example:** `vault kv list kv/apikeys`
   - Deleting a secret:
     - `vault kv delete [OPTIONS] KEY`
-    - **Example:** `vault kv delete -versions=1 CustomerKeys/apikeys/d101`
+    - **Example:** `vault kv delete -versions=1 kv/apikeys/d101`
   - Permanently destroy a secret:
     - `vault kv destroy [OPTIONS] KEY`
-    - **Example:** `vault kv destroy CustomerKeys/apikeys/d101`
+    - **Example:** `vault kv destroy kv/apikeys/d101`
 
 - Example using REST API:
   - Note the `data` in the path
     - ```bash
       curl --header "X-Vault-Token: [VAULT TOKEN]" \
-      http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102
+            http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102
       ```
-  - Getting a specific version
+  - Getting a specific version of the key value
     - ```bash
       curl --header "X-Vault-Token: [VAULT TOKEN]" \
-      http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102?version=1
+            http://127.0.0.1:8200/v1/CustomerKeys/data/apitokens/d102?version=1
       ```
 
 ### Secret Engine: Transit
@@ -1326,8 +1365,8 @@ There are two version of thi engine
 
 - Control dynamic secret lifecycle
 - Dynamic secrets and service tokens are created with a lease
-  - "Leases" for dynamic secrets
-  - "TTL" for service tokens
+  - "Leases" are for dynamic secrets
+  - "TTL" are for service tokens
 - Can renew or revoke a lease
 - Leases have no direct CLI command
   - Use `/sys/leases/lookup` path
