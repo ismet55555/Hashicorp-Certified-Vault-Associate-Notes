@@ -8,8 +8,13 @@
 - [Exam Overview](#exam-overview)
   - [General Objectives](#general-objectives)
 - [Vault Architecture](#vault-architecture)
+- [High Availability (Cluster)](#high-availability-cluster)
+  - [Networking](#networking)
+  - [Vault Replication](#vault-replication)
 - [Vault Setup](#vault-setup)
   - [Installing Vault](#installing-vault)
+    - [Package Manager](#package-manager)
+    - [Binary Download](#binary-download)
   - [Configuring Vault](#configuring-vault)
     - [Configuration Categories and Parameters](#configuration-categories-and-parameters)
   - [Server Initialization and Unseal](#server-initialization-and-unseal)
@@ -18,7 +23,6 @@
     - [Vault Seal Options](#vault-seal-options)
   - [Key Management](#key-management)
   - [Development Mode](#development-mode)
-    - [Step to Set Up Development Mode Server](#step-to-set-up-development-mode-server)
 - [Interacting with Vault](#interacting-with-vault)
 - [Environment Variables](#environment-variables)
 - [Vault UI](#vault-ui)
@@ -38,7 +42,7 @@
   - [`default` Policy](#default-policy)
   - [Policy Syntax](#policy-syntax)
     - [Examples](#examples)
-  - [Templated Policies (Parameters)](#templated-policies-parameters)
+  - [Templated Policies (Dynamic Parameters)](#templated-policies-dynamic-parameters)
   - [Policy Capabilities](#policy-capabilities)
   - [Policy Evaluation Rules](#policy-evaluation-rules)
   - [Working with Policies](#working-with-policies)
@@ -120,11 +124,98 @@ Logical:
 - On backend Vault stores to backend storage, this is also encrypted through encryption keys
 - API -> Barrier -> Vault -> Barrier -> Storage
 
+## High Availability (Cluster)
+
+**Docs:** https://www.vaultproject.io/docs/internals/high-availability
+
+- One active and many standby nodes
+- Active node processes client requests
+
+### Networking
+
+- Passive nodes forward or redirect requests to active node for processing
+- Read-only nodes *(Enterprise only)*
+    - Read or write - Something that doesn't modify backend storage
+- One single node is elected as the leader (active) node
+  - Leader node places a write lock on the backend storage (if supported by backend)
+
+- Cluster configurations
+  - **Docs:**: https://www.vaultproject.io/docs/configuration#high-availability-parameters
+  - Set in the vault config file
+  - `cluster_address` 
+    - Which IP/host address to listen on for cluster based communication
+    - Example
+      - ```hcl
+        listener "tcp" {
+          address = 10.1.1.1:8200           # <-- Listen for vault client requests
+          cluster_address = 10.1.1.1:8201   # <-- Listen for cluster-based communication
+        }
+        ```
+  - `cluster_addr` 
+    - The URL that the node will hand out for cluster for request forwarding.
+    - Example: For active server node (server1)
+      - ```hcl
+        cluster_addr = "https://server1:8201"  # <-- URL for cluster communication coming in
+        ```
+  - `api_addr` 
+    - URL that that the node hands out for cluster for vault client request forwarding
+    - Example: For standby server node (server2)
+      - ```hcl
+        api_addr = "https://server2:8200"      # <-- URL for API requests to Vault server
+        ```
+- Client request handling
+  1. Request Forwarding (default)
+      - Client talks to standby server (or any available server)
+      - The standby server talks to active server in the background
+      - Client never knows that the request has been internally forwarded to active node
+  2. Client Redirection
+      - Client request is redirected to the active node
+      - Client talks directly to active node directly
+  3. Load Balancer
+      - Client sends request to load balancer, load balancer resolves the request to the active node
+      - **HashiCorp recommends not use a load balancer**
+
+
+### Vault Replication
+
+**Docs:** https://www.vaultproject.io/docs/internals/replication
+
+- Enterprise only feature!
+- Unit of replication is the cluster
+  - Primary cluster replicates data to secondary clusters
+  - Replication is one-to-many
+- Replication is asynchronous
+- Replication Options
+  - **Disaster recovery**
+    - Replicates data, tokens, and leases - Immediately available
+    - Only there for disaster recovery, cannot take requests
+  - **Performance**
+    - Replicates data only (not tokens or leases)
+    - Clients in secondary site for this cluster need to generate their own tokens and leases 
+    to talk to this secondary cluster
+    - Allows read-only requests to replicated vault data
+    - Data modification request is forwarded to primary cluster
+- Can have one disaster recovery cluster and one performance cluster at the same time
+
+
+
+
+
+
+
+
+
+
+
 ## Vault Setup
 
 ### Installing Vault
 
 **Docs:** https://learn.hashicorp.com/tutorials/vault/getting-started-install
+
+#### Package Manager
+
+
 
 - **Windows**
 
@@ -132,19 +223,27 @@ Logical:
     choco install vault
     ```
 
-- **MacOS:**
+- **MacOS**
 
   - ```bash
     brew tap hashicorp/tap
     brew install hashicorp/tap/vault
     ```
 
-- **Ubuntu/Debian:**
+- **Ubuntu/Debian**
   - ```bash
     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     sudo apt-get update && sudo apt-get install vault
     ```
+
+#### Binary Download
+
+1. Download the binary
+    - https://www.vaultproject.io/downloads
+    - Unzip/Extract if needed
+2. Move the binary to a directory that is listed on PATH
+
 
 ### Configuring Vault
 
@@ -352,7 +451,7 @@ This is performed after vault has been *installed* and the server is *configured
 
 > **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring 
 > is encrypted by the master key; and the master key is encrypted by the unseal key. The unseal
-> keys is kept in an external and secure location.
+> keys is kept in a separate, external, and secure location.
 
 #### Vault Seal Options
 
@@ -414,14 +513,17 @@ This is performed after Vault has been installed, configured, and initialized.
 - **Never use this in production! This is used for dev/demo/training purposed only**
 - Running on Localhost
 - No SSL - Using HTTP, not HTTPS
-- In-memory storage
-  - Temporary - Once server stops, everything is gone
-    - In production, you need persistent storage / Backend
-- Starts unsealed and initialized
-- UI enabled
-- Key/Value secrets engine enabled
+- In-memory storage only
+  - Temporary
+  - Once vault server stops or exits, all data is gone
+  - In production, you need persistent storage / Backend
+- Initial state
+  - Initialized
+  - Unsealed
+  - Web UI enabled
+  - Key/Value secrets engine enabled
 
-#### Step to Set Up Development Mode Server
+**Steps to Set Up Development Mode Server**
 
 1. Start the development vault server
    - `vault server -dev`
@@ -430,8 +532,8 @@ This is performed after Vault has been installed, configured, and initialized.
    - MacOS/Linux/WSL: `export VAULT_ADDR='http://127.0.0.1:8200'`
    - Windows: `$env:VAULT_ADDR="http://127.0.0.1:8200"`
 4. Login in
-   - `vault login`
-   - Set token: Copy from output from `vault server -dev` output
+   - `vault login <ROOT TOKEN>`
+   - Use root token from output from previous `vault server -dev` output
 
 
 
@@ -468,14 +570,14 @@ This is performed after Vault has been installed, configured, and initialized.
   - `VAULT_TOKEN` - Vault token for requests
   - `VAULT_SKIP_VERIFY` - Skip SSL verification. No verify TLS certificate.
     - Useful for self-signed certificates / Dev environment
-  - `VAULT_FORMAT` - Output format. Default is JSON.
+  - `VAULT_FORMAT` - Output format. Default is "JSON"
     - JSON
     - YAML
     - TOML
   - `VAULT_UNSEAL_KEY` - Unseal key for vault
 
-- If server address not specified:
-  `Error checking seal status: Get "https://127.0.0.1:8200/v1/sys/seal-status": http: server gave HTTP response to HTTPS client`
+- If server address not specified, you may get something like this:
+  - `Error checking seal status: Get "https://127.0.0.1:8200/v1/sys/seal-status": http: server gave HTTP response to HTTPS client`
 
 ## Vault UI
 
@@ -487,13 +589,14 @@ This is performed after Vault has been installed, configured, and initialized.
   1. Navigate to `<VAULT HOST>:<PORT>/ui`
      - **Example:** http://127.0.0.1:8200/ui
   2. Enter your token for access
+- Can copy current token (top right icon)
 
 ## Vault API
 
 - RESTful API - Request/Response
 - Used by any interaction with vault, including UI and CLI
-- Any request tools (ie. curl)
-- Need to specify your token for each request
+- Any request tools (ie. curl, python's request module, etc)
+- Need to add your vault token into each request with `X-Vault-Token` header
 - **Example:** GET request: Get host information
   - ```bash
     curl \
@@ -520,7 +623,8 @@ This is performed after Vault has been installed, configured, and initialized.
 
 ## Authentication Methods
 
-- _The point is to generate a `Token`, then use that Token to log into vault._
+_The point is to generate a vault access token, then use that token to log into vault._
+
 - Provided by plug-ins with binary
 - Can enable multiple auth methods
   - Can also enable multiple instances for multiple auth methods
@@ -603,7 +707,11 @@ This is performed after Vault has been installed, configured, and initialized.
   - This yields a token and its information
   - Passed data includes `role_id` and `secret_id`
   - Using CLI:
-    - `vault write auth/approle/login role_id=<ROLE_ID> secret_id=<SECRET_ID>`
+    - ```
+      vault write auth/approle/login \
+          role_id=<ROLE_ID>
+          secret_id=<SECRET_ID>
+      ```
   - Using REST API
     - POST to `<VAULT_ADDR>/v1/auth/approle/login`
 
@@ -726,7 +834,7 @@ The default policy on a token allows the following:
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#policy-syntax
 
-- Policies are defined as HashiCorp Configuration Language (HCL) _(preferred)_ or JSON
+- Policies are defined as **H**ashiCorp **C**onfiguration **L**anguage (HCL) _(preferred)_ or JSON
 - _Policy Path_ - Where and to what the policy is applied
 - _Policy Capabilities_ - What actions are allowed
 - Basic path expression: `path "some-path/in/vault"`
@@ -785,14 +893,14 @@ The default policy on a token allows the following:
     }
     ```
 - Any number of characters that are bounded within a single path segment, use `+`
-  - **Example** Permit reading `secret/foo/bar/teamb`, `secret/bar/foo/teamb`, etc.
+  - **Example** Permit reading `secret/foo/bar/teamB`, `secret/bar/foo/teamB`, etc.
   - ```hcl
-    path "secret/+/+/teamb" {
+    path "secret/+/+/teamB" {
     	capabilities = ["read"]
     }
     ```
 
-### Templated Policies (Parameters)
+### Templated Policies (Dynamic Parameters)
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#templated-policies
 
@@ -808,16 +916,18 @@ The default policy on a token allows the following:
       path "secret/{{identity.entity.id}}/*" { ... }
       ```
 - **IMPORTANT:** Currently, the only source for parameters is the `identity` secrets engine
+  - **`identity.entity`** - `id`, `name`, `metadata`, `aliases`
+  - **`identity.groups`** - `ids`, `names`
 
 ### Policy Capabilities
 
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#capabilities
 
 - Follows CRUD semantics (**C**reate, **R**ead, **U**pdate, **D**elete)
-  - `create` - Creating data at the given path (similar to `update`) (REST `POST/PUT` request)
-  - `read` - Reading data at the given path (REST `GET` request)
-  - `update` - Changing data at given path (REST `POST/PUT` request)
-  - `delete` - Deleting data at given path (REST `DELETE` request)
+  - `create` - Creating data at the given path (similar to `update`) *(REST `POST/PUT` request)*
+  - `read` - Reading data at the given path *(REST `GET` request)*
+  - `update` - Changing data at given path *(REST `POST/PUT` request)*
+  - `delete` - Deleting data at given path *(REST `DELETE` request)*
 
 - Additional capabilities:
   - `list`
