@@ -67,6 +67,7 @@
   - [Secret Engine: Database](#secret-engine-database)
   - [Secret Engine: Key Value (KV)](#secret-engine-key-value-kv)
   - [Secret Engine: Transit](#secret-engine-transit)
+  - [Secret Engine: Identity](#secret-engine-identity)
 - [Leases](#leases)
   - [Working with Leases](#working-with-leases)
 - [System Backend](#system-backend)
@@ -1435,6 +1436,7 @@ There are two version of thi engine
   - Read a secret:
     - `vault kv get [OPTIONS] KEY`
     - **Example:** `vault kv get -version=2 kv/apikeys/d101`
+    - **Example:** `vault kv get -field=token kv/apikeys/d101`
   - Listing secrets:
     - `vault kv list [OPTIONS] PATH`
     - **Example:** `vault kv list kv/apikeys`
@@ -1470,6 +1472,41 @@ There are two version of thi engine
   - Create random bytes
 - Relieves burden of proper encryption/decryption
 - Encryption keys that it uses to perform all actions are maintained the Transit secrets engine
+
+### Secret Engine: Identity
+
+**Docs:** https://www.vaultproject.io/docs/secrets/identity
+**Tutorial:** https://learn.hashicorp.com/tutorials/vault/identity
+
+- Internally maintains the clients who are recognized by Vault
+- Links identities to tokens
+- Mounted by default
+- Cannot be disabled, moved, or duplicated
+- Hold entities, aliases, and groups
+- Can associate Vault policies to entities or groups
+  - Typical token policies are assigned and evaluated at creation and renewal time **(static)**
+  - Identity policies are assigned to entity or group, evaluated at each request **(dynamic)**:
+- Three main components
+  1. **Entity**
+    - Represents a client (user, machine, etc)
+    - Linked to a token
+    - Example: Create an entity
+      - `vault write identity/entity name=my_entity`
+  2. **Alias**
+    - Represents a way of authentication method objects
+    - Linked to an entity (or group)
+  3. **Group**
+    - Internal groups
+      - Vault internally created group
+      - Can contain other groups and entities
+    - External groups
+      - Auth methods such as LDAP, Okta, or GitHub
+      - Use aliases for membership
+    - Can have entities or other groups as members
+    - Can create a hierarchy of groups, with policy inheritance
+
+
+
 
 ## Leases
 
