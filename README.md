@@ -1698,10 +1698,27 @@ There are two version of thi engine
 
 ## System Backend
 
+**Docs:** https://www.vaultproject.io/api/system
+
 - System Backend is mounted at `/sys`
 - Cannot be disabled or moved
-- List of available system backends can be seen here: https://www.vaultproject.io/api-docs/system
-- Examples
+- Remember to use when using the CLI with `read`, `write`, `list`, `delete`
+  - **Examples:**
+    - `vault read sys/policy/default -format=json`
+    - `vault read /sys/auth`
+    - `vault list transit/keys`
+- Remember to use when using the API with `GET`, `POST`, `LIST`, `DELETE`
+  - **Examples:**
+    - ```hcl
+      curl \
+          --header "X-Vault-Token: ..." \
+          --request PUT \
+          --data @payload.json \
+          http://127.0.0.1:8200/v1/sys/leases/renew
+      ```
+- Endpoints:
+  - `/sys/auth` - Manage authenticaiton methods
+  - `/sys/policy` - Manage policies
+  - `/sys/leases` - Manage leases
   - `/sys/mounts` - Used to manage secrets engines in Vault
-  - `/sys/monitor` - Used to receive streaming logs from the Vault server
-  - `/sys/audit` - Used to list, enable, and disable audit devices
+  - ... more
