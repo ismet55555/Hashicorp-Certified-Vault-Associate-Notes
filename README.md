@@ -48,7 +48,6 @@
   - [Working with Policies](#working-with-policies)
   - [Assigning Policies](#assigning-policies)
   - [Parameter Constraints](#parameter-constraints)
-  - [Require Response Wrapping TTLs (Time to Live)](#require-response-wrapping-ttls-time-to-live)
 - [Tokens](#tokens)
   - [Creating Tokens](#creating-tokens)
   - [Token Properties](#token-properties)
@@ -67,9 +66,13 @@
   - [Secret Engine: Database](#secret-engine-database)
   - [Secret Engine: Key Value (KV)](#secret-engine-key-value-kv)
   - [Secret Engine: Transit](#secret-engine-transit)
-  - [Secret Engine: Identity](#secret-engine-identity)
+    - [Working with Transit Engine](#working-with-transit-engine)
 - [Leases](#leases)
   - [Working with Leases](#working-with-leases)
+- [Vault Agent](#vault-agent)
+  - [Auto-Auth](#auto-auth)
+  - [Caching](#caching)
+  - [Templates](#templates)
 - [System Backend](#system-backend)
 
 <!-- /code_chunk_output -->
@@ -92,6 +95,8 @@
 
 ### General Objectives
 
+Know the following at an *associate* level, not a deep detailed level.
+
 1. Compare authentication methods
 2. Create Vault policies
 3. Assess Vault tokens
@@ -102,6 +107,9 @@
 8. Be aware of the Vault API
 9. Explain Vault architecture
 10. Explain encryption as a service
+
+
+
 
 ## Vault Architecture
 
@@ -135,15 +143,16 @@ Logical:
 ### Networking
 
 - Passive nodes forward or redirect requests to active node for processing
-- Read-only nodes *(Enterprise only)*
-    - Read or write - Something that doesn't modify backend storage
+- Read-only nodes _(Enterprise only)_
+  - Read or list - Something that doesn't modify backend storage
 - One single node is elected as the leader (active) node
-  - Leader node places a write lock on the backend storage (if supported by backend)
+
+  - Leader node places a write lock on the backend storage (if lock supported by backend)
 
 - Cluster configurations
   - **Docs:**: https://www.vaultproject.io/docs/configuration#high-availability-parameters
   - Set in the vault config file
-  - `cluster_address` 
+  - `cluster_address`
     - Which IP/host address to listen on for cluster based communication
     - Example
       - ```hcl
@@ -152,30 +161,30 @@ Logical:
           cluster_address = 10.1.1.1:8201   # <-- Listen for cluster-based communication
         }
         ```
-  - `cluster_addr` 
+  - `cluster_addr`
     - The URL that the node will hand out for cluster for request forwarding.
     - Example: For active server node (server1)
       - ```hcl
         cluster_addr = "https://server1:8201"  # <-- URL for cluster communication coming in
         ```
-  - `api_addr` 
+  - `api_addr`
     - URL that that the node hands out for cluster for vault client request forwarding
     - Example: For standby server node (server2)
       - ```hcl
         api_addr = "https://server2:8200"      # <-- URL for API requests to Vault server
         ```
 - Client request handling
-  1. Request Forwarding (default)
-      - Client talks to standby server (or any available server)
-      - The standby server talks to active server in the background
-      - Client never knows that the request has been internally forwarded to active node
-  2. Client Redirection
-      - Client request is redirected to the active node
-      - Client talks directly to active node directly
-  3. Load Balancer
-      - Client sends request to load balancer, load balancer resolves the request to the active node
-      - **HashiCorp recommends not use a load balancer**
-
+  1. **Request Forwarding (default)**
+     - Client talks to standby server (or any available server)
+     - The standby server talks to active (leader) server in the background
+     - The standby server responds to client
+     - Client never knows that the request has been internally forwarded to active node
+  2. **Client Redirection**
+     - Client request is redirected to the active node
+     - Client talks directly to active node directly
+  3. **Load Balancer**
+     - Client sends request to load balancer, load balancer resolves the request to the active node
+     - **HashiCorp recommends not use a load balancer**
 
 ### Vault Replication
 
@@ -192,21 +201,11 @@ Logical:
     - Only there for disaster recovery, cannot take requests
   - **Performance**
     - Replicates data only (not tokens or leases)
-    - Clients in secondary site for this cluster need to generate their own tokens and leases 
-    to talk to this secondary cluster
+    - Clients in secondary site for this cluster need to generate their own tokens and leases
+      to talk to this secondary cluster
     - Allows read-only requests to replicated vault data
     - Data modification request is forwarded to primary cluster
 - Can have one disaster recovery cluster and one performance cluster at the same time
-
-
-
-
-
-
-
-
-
-
 
 ## Vault Setup
 
@@ -215,8 +214,6 @@ Logical:
 **Docs:** https://learn.hashicorp.com/tutorials/vault/getting-started-install
 
 #### Package Manager
-
-
 
 - **Windows**
 
@@ -241,10 +238,9 @@ Logical:
 #### Binary Download
 
 1. Download the binary
-    - https://www.vaultproject.io/downloads
-    - Unzip/Extract if needed
+   - https://www.vaultproject.io/downloads
+   - Unzip/Extract if needed
 2. Move the binary to a directory that is listed on PATH
-
 
 ### Configuring Vault
 
@@ -284,7 +280,7 @@ This is performed after vault has been installed
       ```
 - **Seal (Optional)**
   - How vault seal is configured
-  - Only used for *auto-unseal* functionality
+  - Only used for _auto-unseal_ functionality
   - Example: Unseal using AWS KMS service
     - ```hcl
       seal "awskms" {
@@ -339,7 +335,7 @@ This is performed after vault has been installed
 
 ### Server Initialization and Unseal
 
-This is performed after vault has been *installed* and the server is *configured*
+This is performed after vault has been _installed_ and the server is _configured_
 
 - **Get Vault Server Status**
   - `vault status`
@@ -450,7 +446,7 @@ This is performed after vault has been *installed* and the server is *configured
   - Can be divided up in multiple keys, entered separately by different users
   - _Never stored by Vault_
 
-> **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring 
+> **Summary:** Vault data is encrypted using the encryption key in the keyring; the keyring
 > is encrypted by the master key; and the master key is encrypted by the unseal key. The unseal
 > keys is kept in a separate, external, and secure location.
 
@@ -463,6 +459,7 @@ This is performed after vault has been *installed* and the server is *configured
   - Used for sensitive operations
   - Manual user intervention required to unseal
 - Auto-unseal
+  - **Docs:** https://learn.hashicorp.com/collections/vault/auto-unseal
   - Provided by some external service (HSM, Azure keyvault, AWS KMS, etc)
   - Uses recovery key shares
   - To enable this seal option, set in config file or environmental variable after initialization
@@ -536,22 +533,6 @@ This is performed after Vault has been installed, configured, and initialized.
    - `vault login <ROOT TOKEN>`
    - Use root token from output from previous `vault server -dev` output
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Interacting with Vault
 
 1. CLI
@@ -606,6 +587,7 @@ This is performed after Vault has been installed, configured, and initialized.
       http://127.0.0.1:8200/v1/sys/host-info
     ```
 - **Example:** POST request: Tune a secret
+
   - ```bash
     cat payload.json
     {
@@ -620,7 +602,6 @@ This is performed after Vault has been installed, configured, and initialized.
         --data @payload.json \
         http://127.0.0.1:8200/v1/sys/mounts/secret/tune
     ```
-
 
 ## Authentication Methods
 
@@ -678,6 +659,7 @@ _The point is to generate a vault access token, then use that token to log into 
   - Vault server pushes SecretID to the client
   - Client hold SecretID when it boots up (maybe through configuration management or image)
 - **AppRole Set up**
+
   - Executed anywhere before using AppRole
   - Enable AppRole:
     - `vault auth enable approle`
@@ -694,6 +676,7 @@ _The point is to generate a vault access token, then use that token to log into 
       ```
 
 - **Getting the SecretId**
+
   - Can be done within the client or before deployment, adding it to the client image
   - Need `role_id`
     - `vault read auth/approle/role/<ROLE_NAME>/role-id`
@@ -743,7 +726,7 @@ TODO
   - Enable userpass
     - `vault auth enable userpass`
     - `vault auth enable -path=globopass userpass` (With custom auth path)
-  - Enable approle  
+  - Enable approle
     - `vault auth enable approle`
 - Tune auth method:
   - `vault auth tune [options] PATH`
@@ -841,18 +824,17 @@ The default policy on a token allows the following:
 - Basic path expression: `path "some-path/in/vault"`
 - Two wildcards are available for path expressions:
   1.  **Glob: `*`**
-      - Always added at the *END* of a path expression
+      - Always added at the _END_ of a path expression
       - This should match the extension of path (Note: This is not RegEx)
       - **Example:** `path "some-path/*"`
         - Evaluated as `path "some-path/something"` and `path "some-path/something/else"`
   2.  **Segment: `+`**
-      - Always added *WITHIN* a path
+      - Always added _WITHIN_ a path
       - This should match any number of characters for a path segment
-      - **Example:** `path "secrets/+/blah"` 
+      - **Example:** `path "secrets/+/blah"`
         - Evaluated as `path "secrets/something/blah"` and `path "secrets/else/blah"`
 - Note: Unless wildcards are specified, the expression is only for the specific path -`"secret/foo"` would only address `secret/foo`, and nothing under it
 - `list` capability allows viewing in UI
-
 
 #### Examples
 
@@ -925,10 +907,11 @@ The default policy on a token allows the following:
 **Docs:** https://www.vaultproject.io/docs/concepts/policies#capabilities
 
 - Follows CRUD semantics (**C**reate, **R**ead, **U**pdate, **D**elete)
-  - `create` - Creating data at the given path (similar to `update`) *(REST `POST/PUT` request)*
-  - `read` - Reading data at the given path *(REST `GET` request)*
-  - `update` - Changing data at given path *(REST `POST/PUT` request)*
-  - `delete` - Deleting data at given path *(REST `DELETE` request)*
+
+  - `create` - Creating data at the given path (similar to `update`) _(REST `POST/PUT` request)_
+  - `read` - Reading data at the given path _(REST `GET` request)_
+  - `update` - Changing data at given path _(REST `POST/PUT` request)_
+  - `delete` - Deleting data at given path _(REST `DELETE` request)_
 
 - Additional capabilities:
   - `list`
@@ -1039,9 +1022,6 @@ Here the policy has to already be created and active in Vault to be assigned.
        }
        ```
 
-### Require Response Wrapping TTLs (Time to Live)
-
-**Docs:**: https://www.vaultproject.io/docs/concepts/policies#required-response-wrapping-ttls
 
 ## Tokens
 
@@ -1116,6 +1096,7 @@ Tokens can be created in the following ways:
 ### Token Types
 
 1. **Service Token**
+
    - Default type of token for most situations
    - Fully featured
    - Heavyweight
@@ -1129,6 +1110,7 @@ Tokens can be created in the following ways:
      - `vault token create -policy=my-policy -ttl=60m`
 
 2. **Batch Token**
+
    - Not default, must be explicitly created
    - Limited features
    - Lightweight
@@ -1234,7 +1216,7 @@ Tokens can be created in the following ways:
   - Tuning settings are same for all secrets engines (ie. description, max lease TTL, etc.)
   - Configuration settings are specific to the entire secrets engine
 
-> **Note:** Secret engine specifics are not needed for the certification exam, only 
+> **Note:** Secret engine specifics are not needed for the certification exam, only
 > how to generally use them.
 
 ### Types of Secrets
@@ -1250,7 +1232,7 @@ Tokens can be created in the following ways:
 
 - **Dynamic Secrets**
   - Generated data on demand
-  - *Lease* issued for each secret (TTL)
+  - _Lease_ issued for each secret (TTL)
   - Automatic lifecycle management
   - Majority of secrets engines are dynamic
 
@@ -1305,37 +1287,29 @@ Tokens can be created in the following ways:
   - Original response is stored in a single-use token's cubbyhole
   - New response is returned with a single-use token
 
-> **NOTE:** The client does not have to authenticate to vault when trying to unwrap, gets instant 
+> **NOTE:** The client does not have to authenticate to vault when trying to unwrap, gets instant
 > access to the secret for one time only
 
 **Using CLI**
-  - Wrap a response of any command
-    - `vault command -wrap-ttl=[DURATION] PATH`
-    - The resulting token (`wrapping_token`) is passed to entity that needs to retrieve that wrapped response
-      **Example:** Create a secret, and wrap the output of the value for the specified key
-        - `vault kv put kv/some_data some_key=some_value`
-        - `vault kv get -wrap-ttl=1h kv/some_data`
-        - Output:
-          - ```text
-            Key                              Value
-            ---                              -----
-            wrapping_token:                  s.WWSuR0GwvjJgscyqS8rffAKL
-            wrapping_accessor:               XwhdoFsKzG2EEoyPQaYTZtj9
-            wrapping_token_ttl:              1h
-            wrapping_token_creation_time:    2022-01-21 22:28:21.2741588 +0000 UTC
-            wrapping_token_creation_path:    kv/data/some_data
-            ```
-  - Unwrap using the issued wrap token
-    - `vault unwrap [OPTIONS] [TOKEN]`
-    - **Example:** Unwrap the previously wrapped response
-      - `vault unwrap -field=data -format=json s.WWSuR0GwvjJgscyqS8rffAKL`
-      - Output:
-        - ```json
-          {
-            "some_key": "some_value"
-          }
-          ```
-**Using API**
+
+- Wrap a response of any command
+  - `vault command -wrap-ttl=[DURATION] PATH`
+  - The resulting token (`wrapping_token`) is passed to entity that needs to retrieve that wrapped response
+    **Example:** Create a secret, and wrap the output of the value for the specified key
+    - `vault kv put kv/some_data some_key=some_value`
+    - `vault kv get -wrap-ttl=1h kv/some_data`
+    - Output:
+      - ```text
+        Key                              Value
+        ---                              -----
+        wrapping_token:                  s.WWSuR0GwvjJgscyqS8rffAKL
+        wrapping_accessor:               XwhdoFsKzG2EEoyPQaYTZtj9
+        wrapping_token_ttl:              1h
+        wrapping_token_creation_time:    2022-01-21 22:28:21.2741588 +0000 UTC
+        wrapping_token_creation_path:    kv/data/some_data
+        ```
+- Unwrap using the issued wrap token - `vault unwrap [OPTIONS] [TOKEN]` - **Example:** Unwrap the previously wrapped response - `vault unwrap -field=data -format=json s.WWSuR0GwvjJgscyqS8rffAKL` - Output: - `json { "some_key": "some_value" } `
+  **Using API**
 
 Similar to CLI, but using the API in the following format:
 
@@ -1353,7 +1327,6 @@ Similar to CLI, but using the API in the following format:
         --request POST \
         <VAULT_ADDRESS>/v1/sys/wrapping/unwrap
     ```
-
 
 ### Secrets Engine: Cubbyhole
 
@@ -1381,6 +1354,7 @@ Similar to CLI, but using the API in the following format:
 ### Secrets Engine: Identity
 
 **Docs:** https://www.vaultproject.io/docs/secrets/identity
+**Tutorial:** https://learn.hashicorp.com/tutorials/vault/identity
 
 - Maintains and keeps track of clients who are recognized by Vault
 - "Clients" are users or applications that have been authenticated by Vault
@@ -1395,6 +1369,32 @@ Similar to CLI, but using the API in the following format:
     can be mapped to a single entity in Vault that has 2 aliases, one
     of type GitHub and one of type LDAP.
 - Can place entities in different groups to manage policy assignments to entities
+- Internally maintains the clients who are recognized by Vault
+- Links identities to tokens
+- Mounted by default
+- Cannot be disabled, moved, or duplicated
+- Hold entities, aliases, and groups
+- Can associate Vault policies to entities or groups
+  - Typical token policies are assigned and evaluated at creation and renewal time **(static)**
+  - Identity policies are assigned to entity or group, evaluated at each request **(dynamic)**:
+- Three main components
+  1. **Entity**
+  - Represents a client (user, machine, etc)
+  - Linked to a token
+  - Example: Create an entity
+    - `vault write identity/entity name=my_entity`
+  2. **Alias**
+  - Represents a way of authentication method objects
+  - Linked to an entity (or group)
+  3. **Group**
+  - Internal groups
+    - Vault internally created group
+    - Can contain other groups and entities
+  - External groups
+    - Auth methods such as LDAP, Okta, or GitHub
+    - Use aliases for membership
+  - Can have entities or other groups as members
+  - Can create a hierarchy of groups, with policy inheritance
 
 ### Secret Engine: Database
 
@@ -1428,6 +1428,7 @@ There are two version of thi engine
   - Can be specified at creation
 
 - Usage
+
   - **Docs:**: https://www.vaultproject.io/docs/secrets/kv/kv-v2#usage
   - Getting help: `vault kv --help`
   - Create/Writing a secret:
@@ -1462,9 +1463,11 @@ There are two version of thi engine
 ### Secret Engine: Transit
 
 **Docs:** https://www.vaultproject.io/docs/secrets/transit
+**Tutorial:** https://learn.hashicorp.com/tutorials/vault/eaas-transit
 
-- Provides encryption as a service
-- Vault doesn't store the data sent to this engine, only the encrypted keys for its actions
+- Provides **encryption as a service**
+- Doesn't store the data sent to this engine
+- Only the encrypted keys are stored
 - Supported actions:
   - Encrypt and decrypt data
   - Can sign and verify that data
@@ -1472,40 +1475,84 @@ There are two version of thi engine
   - Create random bytes
 - Relieves burden of proper encryption/decryption
 - Encryption keys that it uses to perform all actions are maintained the Transit secrets engine
+- Default path is `transit/`
+- Operations
+  - Enable engine
+  - Add cryptographic keys
+  - View keys and versions
+  - Encrypt data with key
+  - Decrypt data with key
+  - Rotate and manage key versions
+- Cryptographic keys features
+  - Basic types: AES, ChaCha20, ED25519, ECDSA, RSA, etc.
+  - The key type determines the supported actions
+  - Convergent encryption
+    - Deterministic - Regardless of key version, the encryption value will always be the same
+    - Less secure - Bad actor can infer values, since it always resolves to the same output
+    - Kind of like a hash
+    - Not supported by all key types
+  - Key versioning
+    - Each key is a map of key versions
+    - Working set - All available versions of the key that vault can reference (in memory)
+    - Retired set - Keys stored in archive (not in memory)
+    - Versioning settings
+      - `min_decryption_version` - Minimum key version to decrypt data
+      - `min_encryption_version` - Minimum key version to encrypt data
+    - `rotate` - Add a new version
+    - `config` - Change version settings
+    - `trim` - Delete key permanently
 
-### Secret Engine: Identity
+#### Working with Transit Engine
 
-**Docs:** https://www.vaultproject.io/docs/secrets/identity
-**Tutorial:** https://learn.hashicorp.com/tutorials/vault/identity
-
-- Internally maintains the clients who are recognized by Vault
-- Links identities to tokens
-- Mounted by default
-- Cannot be disabled, moved, or duplicated
-- Hold entities, aliases, and groups
-- Can associate Vault policies to entities or groups
-  - Typical token policies are assigned and evaluated at creation and renewal time **(static)**
-  - Identity policies are assigned to entity or group, evaluated at each request **(dynamic)**:
-- Three main components
-  1. **Entity**
-    - Represents a client (user, machine, etc)
-    - Linked to a token
-    - Example: Create an entity
-      - `vault write identity/entity name=my_entity`
-  2. **Alias**
-    - Represents a way of authentication method objects
-    - Linked to an entity (or group)
-  3. **Group**
-    - Internal groups
-      - Vault internally created group
-      - Can contain other groups and entities
-    - External groups
-      - Auth methods such as LDAP, Okta, or GitHub
-      - Use aliases for membership
-    - Can have entities or other groups as members
-    - Can create a hierarchy of groups, with policy inheritance
-
-
+- Enable the transit engine
+  - `vault secrets enable transit`
+- Create a new key
+  - `vault write [-force] PATH/<KEY_NAME> [DATA] [PARAMETERS]`
+  - **Example:** Let Vault generate key `my_key` without given input
+    - `vault write -force transit/keys/my_key`
+- List keys
+  - `vault list PATH`
+  - **Example:** List all keys
+    - `vault list transit/keys`
+- Read key info
+  - `vault read PATH/<keyname>`
+  - **Example:** Read key info
+    - `vault read transit/keys/my_key`
+- Rotate a key
+  - `vault write [-force] PATH/rotate [DATA]`
+  - **Example:** Rotate a key
+    - `vault write -force transit/keys/my_key/rotate`
+- Configure available key versions
+  - `vault write PATH/config/ [PARAMETERS]`
+  - **Example:** Change minimum decryption version available for use
+    - `vault write transit/keys/my_key/config min_decryption_version=4`
+- Remove older key versions
+  - `vault write PATH/trim [PARAMETERS]`
+  - **Example:** Remove all key versions before version 3 (delete versions 1, 2)
+    - `vault write transit/keys/my_key/trim min_available_version=3`
+- Generate a random number
+  - `vault write -force transit/random/[BYTES] format=[FORMAT]`
+  - Number of bytes could be `32`, `128`, etc
+  - `-format` can be `base64` or `hex`
+  - **Example:** Generate a random number of 32 bytes in base64 format
+    - `vault write -force transit/random/32 format=base64`
+- Encrypt plain text data
+  - `vault write transit/encrypt/<KEY_NAME> plaintext=$(base64 <<< "TEXT")`
+  - Note: All submitted plaintext data must be base64 encoded
+  - If key version is not specified, the latest version will be used
+  - **Example:** Encrypt some text
+    - `vault write transit/encrypt/my-key plaintext=$(base64 <<< "my secret data")`
+  - **Example:** Encrypt data and get the ciphertext
+    - `json_data=$(vault write transit/encrypt/ccid plaintext=$(base64 <<< "4444123412341234") -format=json)`
+    - `ciphertext=$(echo $json_data | jq .data.ciphertext -r)`
+- Decrypt data
+    - `vault write transit/decrypt/<KEY_NAME> ciphertext="CIPHERTEXT"`
+    - Will return the decrypted plaintext in base64 encoding
+    - **Example:** Decrypt some ciphertext
+      - `vault write transit/decrypt/my-key ciphertext="vault:v1:LfVRRCWB1i7smddTwqQbitqO1nHr9zoAoPVkVTJUtxkQYpe+ydnDTHcQQ/ui"`
+    - **Example:** Decrypt data and get the plaintext
+      - `plaintext=$(vault write transit/decrypt/ccid ciphertext=$ciphertext -format=json | jq .data.plaintext -r)`
+      - `echo $plaintext | base64 --decode`
 
 
 ## Leases
@@ -1551,6 +1598,103 @@ There are two version of thi engine
   - `vault write [OPTIONS] sys/leases/lookup/ lease_id=LEASE_ID`
   - **Example:** `vault write sys/leases/lookup/ lease_id=consul/creds/web/KWq5lsjdsf89sfjsdfG`
   - Note, this is a write/POST operation since we are submitting data in part of the request
+
+
+## Vault Agent
+
+**Docs:** https://www.vaultproject.io/docs/agent
+
+
+- Vault agent is a client deamon or service
+- Part of the vault binary
+- Configured using HashiCorp Configuraiton Language (HCL)
+- Integration Challenges solved by vault agent
+  - Handling authentication
+  - Managing tokens and leases
+  - Secret storage and renewal
+- Starting a vault agent:
+  - `vault agent -config=/path/to/config.hcl`
+
+
+### Auto-Auth
+
+**Docs:** https://www.vaultproject.io/docs/agent/autoauth
+
+- Automatically authicate client and manage token
+- Renewal of token when possible
+- **Method**
+  - Auth method used to authenticate with server (ie. userpass, approle, etc)
+- **Sink**
+  - Local location where agent should wriet token
+  - Just a local file
+  - Application/Service will consume this value and talk to vault server
+- Token in the sink can be response-wrapped or encypted
+- Application gets token from sink -> vault auth request to agent -> agent proxies auth request to server
+- Auto-auth configuraiton inside vault agent configuraiton file
+  - Auth method can be approle, aws, kubernetes, etc
+  - ```hcl
+    auto_auth {
+      method = "name" {
+        mount_path = "path/to/auth_method"
+        config = {...}                 # <-- Settings for specific auth method
+      }
+      sink = "file" {               # <-- Only sink type supported so far
+        config = {
+          path = "/path/to/file"    # <-- Path for tokenm file
+        } 
+      }
+   
+    ```
+
+### Caching
+
+**Docs:** https://www.vaultproject.io/docs/agent/caching
+
+- Secrets and token caching locally
+- All requests must use vault agent, cannot go straight to server
+- Imporves performance (reads local cache)
+- Works with auth-auth to skip authenticaiton to server
+- Renews secrets and tokens when possible
+- Caching configuraiton inside the agent configuraiton file
+  - ```hcl
+    cache {
+      use_auto_auth_token = true   # <-- Forcing vault agent to use auto-auth token
+    }
+    listener "tcp" {               # <-- Can also be unix socket ("unix")
+      address = "127.0.0.1:8100"   # <-- Vault agent listens on this address. Can be URl if TCP or file for unix socket
+      tls_disable = true           # <-- In production, probably want this to false
+    }
+    ```
+
+### Templates
+
+**Docs:** https://www.vaultproject.io/docs/agent/template
+
+- Uses Consul template markup language (Won't be on exam)
+- Render secrets to files
+- Takes secrets response from vault server and renders them to a files
+- Can set persmisisons on files
+- Can run arbitrary commands
+  - Create environment variable referenced later
+  - Update the applicaton with secrets information
+- Tempalte configuration inside the agent configuraiton file
+  - ```hcl
+    template {
+      source = "template.ctmpl"     # <-- Template file writen in Consul language
+      destination = "/path/to/file" # <-- Path to file to write rendered template
+      perm = "640"                  # <-- File permissions of destination file
+    }
+    ```
+- Consul templating: Simple Vault secret read
+  - **Docs:** https://github.com/hashicorp/consul-template/blob/master/docs/templating-language.md#secret
+  - Example of a template file
+    - ```consul
+      {{ with secret "secret/my-secret" }}  #<-- "secret" function and path to secret in vault
+      {{ .Data.data.foo }}                  #<-- Reads "foo" key from secret
+      {{ end }} 
+      ```
+    - The value of vault secret `my-secret`, field `foo` will be written to the sink file
+
 
 ## System Backend
 
