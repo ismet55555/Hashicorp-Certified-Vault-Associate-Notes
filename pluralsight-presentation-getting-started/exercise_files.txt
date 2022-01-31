@@ -1,2 +1,0 @@
-Exercise files can be found on GitHub:
-https://github.com/ned1313/Hashicorp-Certified-Vault-Associate-Getting-Started

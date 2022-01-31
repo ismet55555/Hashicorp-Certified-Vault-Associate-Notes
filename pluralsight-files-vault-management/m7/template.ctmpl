@@ -1,3 +1,0 @@
-{{ with secret "apikeys/key1" }}
-{{ .Data.data.key }}
-{{ end }}

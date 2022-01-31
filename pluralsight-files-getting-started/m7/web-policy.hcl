@@ -1,3 +1,0 @@
-service "web" {
-    policy = "read"
-}

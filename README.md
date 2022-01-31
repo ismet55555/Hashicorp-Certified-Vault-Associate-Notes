@@ -837,7 +837,7 @@ Can be done using `vault login` or `vault write`
 This policy is automatically attached to all tokens.
 The `default` policy attached to a token allows the following:
 
-- `default` policy cannot be deleted or modified
+- `default` policy cannot be deleted 
 
 - Look up their own properties
   - ```hcl
