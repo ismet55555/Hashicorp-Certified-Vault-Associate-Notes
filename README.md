@@ -170,7 +170,7 @@ Logical:
         cluster_addr = "https://server1:8201"  # <-- URL for cluster communication coming in
         ```
   - `api_addr`
-    - URL that that the node hands out for cluster for vault client request forwarding
+    - URL that that the node hands out for cluster for vault client redirection
     - Example: For standby server node (server2)
       - ```hcl
         api_addr = "https://server2:8200"      # <-- URL for API requests to Vault server
