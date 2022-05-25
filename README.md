@@ -1,4 +1,4 @@
-<p align="center"><img width="150" alt="portfolio_view" src="logo.png"></p>
+<p align="center"><img width="150" alt="portfolio_view" src="vault-logo.png"></p>
 
 <h1 align="center">Hashicorp Certified Vault Associate Notes</h1>
 <h4 align="center"><a href="https://www.hashicorp.com/certification/vault-associate">hashicorp.com/certification/vault-associate</a></h3>
